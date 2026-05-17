@@ -1,0 +1,57 @@
+# AeroSafetyEval base configuration
+# All values here are defaults; override via environment variables or
+# a run-specific YAML that merges with this file.
+#
+# IMPORTANT: Do NOT commit API keys or secrets here.
+# Use .env (gitignored) and aerosafety/config loading to inject them.
+
+# ── Project metadata ──────────────────────────────────────────────────────
+project:
+  name: aerosafety
+  version: "0.1.0-dev"
+  description: "Reliability Limits of Agentic AI in Aviation Operations and Safety"
+
+# ── Reproducibility ───────────────────────────────────────────────────────
+reproducibility:
+  global_seed: 42
+  # Must be "1" at eval time (enforced by aerosafety.determinism.assert_eval_mode)
+  eval_mode_env_var: AEROSAFETY_EVAL_MODE
+
+# ── Logging ───────────────────────────────────────────────────────────────
+logging:
+  # Directory where ExperimentLogger writes JSONL files (must exist)
+  output_dir: logs
+  # Flush immediately (no buffering) — required per CLAUDE.md §8.1
+  flush_immediately: true
+
+# ── Evaluation defaults ───────────────────────────────────────────────────
+evaluation:
+  # Hard upper bound on agent output tokens (per task)
+  max_output_tokens: 2048
+  # Tool call timeout in seconds; raise on timeout (no silent fallback)
+  tool_call_timeout_s: 30
+  # Maximum tool calls per task (safety guard)
+  max_tool_calls_per_task: 20
+  # Severity weights for SWFR (per proposal §12.8)
+  severity_weights:
+    Low: 1
+    Medium: 3
+    High: 5
+    Critical: 10
+
+# ── Agent defaults ────────────────────────────────────────────────────────
+agent:
+  # Temperature for deterministic eval (must be 0 at eval time)
+  temperature: 0.0
+  # Default to no retrieval; override in agent-specific configs
+  use_rag: false
+  use_tools: false
+  use_verifier: false
+
+# ── Data paths ────────────────────────────────────────────────────────────
+data:
+  task_cards_dir: data/task_cards
+  corpora_dir: data/corpora
+  # Frozen eval set (immutable after freeze)
+  eval_set_path: data/eval/eval_set.jsonl
+  dev_set_path: data/eval/dev_set.jsonl

@@ -1,0 +1,71 @@
+# AeroSafetyEval model registry
+#
+# Each entry describes a model used in evaluation.
+# Fields:
+#   id          — short identifier used in experiment configs and filenames
+#   provider    — API provider (e.g. openai, anthropic, huggingface, local)
+#   model_name  — exact API model name or HuggingFace model ID
+#   family      — model family for grouping results
+#   context_len — declared context window in tokens
+#   api_env_var — env var name holding the API key (must not be hardcoded here)
+#   notes       — version or access notes
+#
+# IMPORTANT: Do NOT add custom or unofficial model IDs without documenting
+# the exact version. Per CLAUDE.md §5.2, model versions must be archived.
+
+models:
+
+  # ── OpenAI ──────────────────────────────────────────────────────────────
+  - id: gpt-4o
+    provider: openai
+    model_name: gpt-4o-2024-08-06
+    family: GPT-4o
+    context_len: 128000
+    api_env_var: OPENAI_API_KEY
+    notes: "Pinned to 2024-08-06 snapshot for reproducibility"
+
+  - id: gpt-4o-mini
+    provider: openai
+    model_name: gpt-4o-mini-2024-07-18
+    family: GPT-4o-mini
+    context_len: 128000
+    api_env_var: OPENAI_API_KEY
+    notes: "Pinned to 2024-07-18 snapshot"
+
+  # ── Anthropic ────────────────────────────────────────────────────────────
+  - id: claude-opus-4-7
+    provider: anthropic
+    model_name: claude-opus-4-7
+    family: Claude-4
+    context_len: 200000
+    api_env_var: ANTHROPIC_API_KEY
+    notes: ""
+
+  - id: claude-sonnet-4-6
+    provider: anthropic
+    model_name: claude-sonnet-4-6
+    family: Claude-4
+    context_len: 200000
+    api_env_var: ANTHROPIC_API_KEY
+    notes: ""
+
+  - id: claude-haiku-4-5
+    provider: anthropic
+    model_name: claude-haiku-4-5-20251001
+    family: Claude-4
+    context_len: 200000
+    api_env_var: ANTHROPIC_API_KEY
+    notes: ""
+
+  # ── Open-source (HuggingFace / local) ───────────────────────────────────
+  # NOTE: Add entries here when fine-tuned checkpoints are ready.
+  # Per CLAUDE.md §6.1, checkpoint lineage must be documented.
+  #
+  # Example (NOT IMPLEMENTED — placeholder only):
+  # - id: aero-sft-llama3-8b
+  #   provider: local
+  #   model_name: checkpoints/aero-sft-llama3-8b-v1
+  #   family: Llama-3
+  #   context_len: 8192
+  #   api_env_var: ~
+  #   notes: "NOT IMPLEMENTED — checkpoint does not yet exist"

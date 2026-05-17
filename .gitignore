@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env.local
+
+# Secrets — NEVER commit
+.env
+*.key
+*.pem
+secrets/
+
+# Data (large files; tracked via DVC or separate storage)
+data/corpora/
+data/raw/
+data/eval/eval_set.jsonl
+data/eval/dev_set.jsonl
+*.jsonl
+!tests/fixtures/*.jsonl
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.bin
+*.safetensors
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Type stubs
+.mypy_cache/
