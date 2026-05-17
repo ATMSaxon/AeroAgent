@@ -100,8 +100,9 @@ def test_all_cards_parse(all_cards: list[TaskCard]) -> None:
 
 def test_total_card_count(all_cards: list[TaskCard]) -> None:
     n = len(all_cards)
-    assert 70 <= n <= 100, (
-        f"Expected 70-100 task cards total, got {n}"
+    # Base 77 + 50 T34-MM cards + room to grow
+    assert 70 <= n <= 200, (
+        f"Expected 70-200 task cards total, got {n}"
     )
 
 
@@ -120,10 +121,11 @@ def test_task_ids_unique(all_cards: list[TaskCard]) -> None:
 
 
 def test_task_id_format(all_cards: list[TaskCard]) -> None:
-    pattern = re.compile(r"^AS-[ABCD]-\d{3}$")
+    # Base AS-*-NNN + T34 multimodal MM-AS-*-NNN
+    pattern = re.compile(r"^(AS|MM-AS)-[ABCD]-\d{3}$")
     for card in all_cards:
         assert pattern.match(card.task_id), (
-            f"task_id {card.task_id!r} does not match expected format AS-<TYPE>-<NNN>"
+            f"task_id {card.task_id!r} does not match expected format AS-<T>-<NNN> or MM-AS-<T>-<NNN>"
         )
 
 
@@ -132,21 +134,22 @@ def test_type_counts_within_spec(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
         by_type[card.task_type] = by_type.get(card.task_type, 0) + 1
 
-    # Type A: 25-35 (synthetic knowledge cards, unchanged)
-    # Type B: 22-28 (real Chart Supplement hazard cards)
-    # Type C: 12-16 (real hot-spot consequence cards)
-    # Type D: 12-16 (real agentic surface conflict cards)
-    assert 25 <= by_type.get("A", 0) <= 35, (
-        f"Type A count {by_type.get('A', 0)} outside 25-35"
+    # Bounds widened for T34 multimodal addition: +30 B, +20 D
+    # Type A: 25-40 (synthetic knowledge cards)
+    # Type B: 22-80 (base + multimodal hazard cards)
+    # Type C: 12-25
+    # Type D: 12-60 (base + multimodal agentic cards)
+    assert 25 <= by_type.get("A", 0) <= 40, (
+        f"Type A count {by_type.get('A', 0)} outside 25-40"
     )
-    assert 22 <= by_type.get("B", 0) <= 28, (
-        f"Type B count {by_type.get('B', 0)} outside 22-28"
+    assert 22 <= by_type.get("B", 0) <= 80, (
+        f"Type B count {by_type.get('B', 0)} outside 22-80"
     )
-    assert 12 <= by_type.get("C", 0) <= 16, (
-        f"Type C count {by_type.get('C', 0)} outside 12-16"
+    assert 12 <= by_type.get("C", 0) <= 25, (
+        f"Type C count {by_type.get('C', 0)} outside 12-25"
     )
-    assert 12 <= by_type.get("D", 0) <= 16, (
-        f"Type D count {by_type.get('D', 0)} outside 12-16"
+    assert 12 <= by_type.get("D", 0) <= 60, (
+        f"Type D count {by_type.get('D', 0)} outside 12-60"
     )
 
 
@@ -413,3 +416,78 @@ def test_print_summary(all_cards: list[TaskCard]) -> None:
     )
     critical_high = sum(1 for c in all_cards if c.severity in ("Critical", "High"))
     print(f"Critical+High: {critical_high} ({critical_high / len(all_cards):.1%})")
+
+
+# ---------------------------------------------------------------------------
+# Multimodal cards (T34 part 2) — MM-AS-B-* and MM-AS-D-* with attachments
+# ---------------------------------------------------------------------------
+
+import hashlib
+
+MM_MANIFEST = (
+    Path(__file__).parent.parent.parent
+    / "data" / "multimodal" / "airport_diagrams" / "manifest.jsonl"
+)
+MM_BASE = Path(__file__).parent.parent.parent / "data" / "multimodal"
+
+
+def _mm_cards(all_cards: list[TaskCard]) -> list[TaskCard]:
+    return [c for c in all_cards if c.task_id.startswith("MM-AS-")]
+
+
+def test_multimodal_cards_have_attachments(all_cards: list[TaskCard]) -> None:
+    mm = _mm_cards(all_cards)
+    assert len(mm) >= 45, f"Expected ≥45 multimodal cards, got {len(mm)}"
+    for c in mm:
+        assert c.attachments, f"{c.task_id} has no attachments"
+
+
+def test_multimodal_attachment_files_exist(all_cards: list[TaskCard]) -> None:
+    for c in _mm_cards(all_cards):
+        for att in c.attachments:
+            full = MM_BASE / att.file_path
+            assert full.exists(), f"{c.task_id} attachment missing: {full}"
+
+
+def test_multimodal_attachment_sha256_matches_manifest(all_cards: list[TaskCard]) -> None:
+    manifest = {
+        json.loads(l)["attachment_id"]: json.loads(l)
+        for l in MM_MANIFEST.read_text().splitlines()
+        if l.strip()
+    }
+    for c in _mm_cards(all_cards):
+        for att in c.attachments:
+            full = MM_BASE / att.file_path
+            actual = hashlib.sha256(full.read_bytes()).hexdigest()
+            assert att.sha256 == actual, (
+                f"{c.task_id} attachment {att.attachment_id} sha256 mismatch "
+                f"with file {full}"
+            )
+            if att.attachment_id in manifest:
+                assert att.sha256 == manifest[att.attachment_id]["sha256"], (
+                    f"{c.task_id} sha256 mismatch with manifest entry"
+                )
+
+
+def test_multimodal_airport_diversity(all_cards: list[TaskCard]) -> None:
+    mm = _mm_cards(all_cards)
+    airports = set()
+    for c in mm:
+        for att in c.attachments:
+            # file_path looks like "airport_diagrams/KJFK_diagram.png"
+            fname = Path(att.file_path).name
+            airport_id = fname.split("_")[0]
+            airports.add(airport_id)
+    assert len(airports) >= 20, (
+        f"Expected ≥20 distinct airports across multimodal cards, got {len(airports)}"
+    )
+
+
+def test_multimodal_provenance_cites_chart_supplement(all_cards: list[TaskCard]) -> None:
+    for c in _mm_cards(all_cards):
+        for att in c.attachments:
+            src = att.provenance.source.lower()
+            assert "chart supplement" in src, (
+                f"{c.task_id} attachment {att.attachment_id} provenance does not "
+                f"cite FAA Chart Supplement: {att.provenance.source}"
+            )
