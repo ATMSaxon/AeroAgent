@@ -1,8 +1,17 @@
-# Synthetic Construction Rules — Family 8: Maintenance / MEL / Service Difficulty
+# Synthetic Construction Rules — Family 8: Maintenance and Operational Reliability
+# Updated T27 (2026-05-17): Hybrid real/synthetic data model
 
 **Per CLAUDE.md §2.2: Every synthetic record must carry explicit generation_rule documentation.**
 
-This file documents the rules used to construct all synthetic MEL provisions, maintenance scenarios, and tool interaction scenarios in this task family. All task cards (MX-A-*, MX-B-*, MX-C-*, MX-D-*) are SYNTHETIC unless explicitly stated otherwise. No real operator MEL documents, maintenance logs, or SDR records were used.
+This file documents the rules used to construct synthetic MEL provisions, maintenance scenarios, and tool interaction scenarios in this task family.
+
+**Provenance model (T27 hybrid)**:
+- Type A cards: `source = "SYNTHETIC"` (MEL knowledge; no real data applicable)
+- Type B/C/D SYNTHETIC cards: `source` contains the full proprietary note:
+  > SYNTHETIC: real MEL is operator-specific and proprietary (FAA Order 8900.1); SDR public access also unavailable (av-info.faa.gov 503, sdrs.faa.gov login-walled). Scenarios constructed from public FAA Order 8900.1 + ICAO Doc 9760 rules.
+- Type B/C/D REAL cards: `source` cites a manifest-verified NTSB report ID or CAROL record ID with access date 2026-05-17.
+
+See `real_data_search_results.md` for the full data investigation log.
 
 ---
 

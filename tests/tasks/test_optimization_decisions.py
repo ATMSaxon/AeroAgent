@@ -269,12 +269,39 @@ def test_synthetic_cards_have_no_access_date(all_cards: list[TaskCard]) -> None:
             )
 
 
-def test_all_cards_are_synthetic(all_cards: list[TaskCard]) -> None:
+def test_type_a_cards_are_synthetic(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
-        assert card.provenance.source == "SYNTHETIC", (
-            f"task_id={card.task_id}: Phase 1 pilot cards must all be SYNTHETIC; "
-            f"got source={card.provenance.source!r}"
-        )
+        if card.task_type == "A":
+            assert card.provenance.source == "SYNTHETIC", (
+                f"task_id={card.task_id}: Type A knowledge cards must be SYNTHETIC; "
+                f"got source={card.provenance.source!r}"
+            )
+
+
+def test_real_bd_cards_cite_or_library(all_cards: list[TaskCard]) -> None:
+    bd_cards = [c for c in all_cards if c.task_type in ("B", "D")]
+    beasley_doi = "10.2307/2582903"
+    or_lib_keyword = "OR_LIBRARY"
+
+    def has_citation(card: TaskCard) -> bool:
+        src = card.provenance.source or ""
+        return beasley_doi in src and or_lib_keyword in src
+
+    citing = sum(1 for c in bd_cards if has_citation(c))
+    pct = citing / len(bd_cards)
+    assert pct >= 0.60, (
+        f"Only {pct:.1%} of B+D cards cite OR-Library + Beasley DOI; expected >=60%"
+    )
+
+
+def test_real_c_cards_cite_bts(all_cards: list[TaskCard]) -> None:
+    c_cards = [c for c in all_cards if c.task_type == "C"]
+    bts_keyword = "BTS_ONTIME"
+    citing = sum(1 for c in c_cards if bts_keyword in (c.provenance.source or ""))
+    pct = citing / len(c_cards)
+    assert pct >= 0.80, (
+        f"Only {pct:.1%} of C cards cite BTS data; expected >=80%"
+    )
 
 
 # ---------------------------------------------------------------------------

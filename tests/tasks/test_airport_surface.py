@@ -100,8 +100,8 @@ def test_all_cards_parse(all_cards: list[TaskCard]) -> None:
 
 def test_total_card_count(all_cards: list[TaskCard]) -> None:
     n = len(all_cards)
-    assert 70 <= n <= 90, (
-        f"Expected 70-90 task cards total (per T17 brief), got {n}"
+    assert 70 <= n <= 100, (
+        f"Expected 70-100 task cards total, got {n}"
     )
 
 
@@ -132,19 +132,21 @@ def test_type_counts_within_spec(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
         by_type[card.task_type] = by_type.get(card.task_type, 0) + 1
 
-    # Per T17 brief:
-    # Type A: 25-35, Type B: 18-22, Type C: 12-15, Type D: 10-15
+    # Type A: 25-35 (synthetic knowledge cards, unchanged)
+    # Type B: 22-28 (real Chart Supplement hazard cards)
+    # Type C: 12-16 (real hot-spot consequence cards)
+    # Type D: 12-16 (real agentic surface conflict cards)
     assert 25 <= by_type.get("A", 0) <= 35, (
         f"Type A count {by_type.get('A', 0)} outside 25-35"
     )
-    assert 18 <= by_type.get("B", 0) <= 22, (
-        f"Type B count {by_type.get('B', 0)} outside 18-22"
+    assert 22 <= by_type.get("B", 0) <= 28, (
+        f"Type B count {by_type.get('B', 0)} outside 22-28"
     )
-    assert 12 <= by_type.get("C", 0) <= 15, (
-        f"Type C count {by_type.get('C', 0)} outside 12-15"
+    assert 12 <= by_type.get("C", 0) <= 16, (
+        f"Type C count {by_type.get('C', 0)} outside 12-16"
     )
-    assert 10 <= by_type.get("D", 0) <= 15, (
-        f"Type D count {by_type.get('D', 0)} outside 10-15"
+    assert 12 <= by_type.get("D", 0) <= 16, (
+        f"Type D count {by_type.get('D', 0)} outside 12-16"
     )
 
 
@@ -260,13 +262,19 @@ def test_synthetic_cards_have_no_access_date(all_cards: list[TaskCard]) -> None:
             )
 
 
-def test_all_cards_are_synthetic(all_cards: list[TaskCard]) -> None:
-    # All Family 5 pilot cards are SYNTHETIC (no real airport diagrams accessed)
-    for card in all_cards:
-        assert card.provenance.source == "SYNTHETIC", (
-            f"task_id={card.task_id}: Family 5 pilot cards must all be SYNTHETIC; "
-            f"got source={card.provenance.source!r}"
-        )
+def test_real_airport_citation_rate_bcd(all_cards: list[TaskCard]) -> None:
+    """>=60% of Type B+C+D cards must cite a real FAA Chart Supplement source."""
+    bcd_cards = [c for c in all_cards if c.task_type in ("B", "C", "D")]
+    if not bcd_cards:
+        pytest.skip("No B/C/D cards found")
+    real_cards = [
+        c for c in bcd_cards if c.provenance.source != "SYNTHETIC"
+    ]
+    rate = len(real_cards) / len(bcd_cards)
+    assert rate >= 0.60, (
+        f"Only {rate:.1%} of B+C+D cards cite real Chart Supplement data "
+        f"({len(real_cards)}/{len(bcd_cards)}); expected >=60%"
+    )
 
 
 # ---------------------------------------------------------------------------

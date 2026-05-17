@@ -252,7 +252,8 @@ def test_every_card_has_provenance_license(all_cards: list[TaskCard]) -> None:
 
 def test_synthetic_cards_have_generation_rule(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
-        if card.provenance.source == "SYNTHETIC":
+        src = card.provenance.source or ""
+        if src.startswith("SYNTHETIC"):
             assert card.provenance.generation_rule, (
                 f"task_id={card.task_id}: SYNTHETIC card missing generation_rule"
             )
@@ -264,18 +265,78 @@ def test_synthetic_cards_have_generation_rule(all_cards: list[TaskCard]) -> None
 
 def test_synthetic_cards_have_no_access_date(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
-        if card.provenance.source == "SYNTHETIC":
+        src = card.provenance.source or ""
+        if src.startswith("SYNTHETIC"):
             assert card.provenance.access_date is None, (
                 f"task_id={card.task_id}: SYNTHETIC card should have access_date=None"
             )
 
 
-def test_all_cards_are_synthetic(all_cards: list[TaskCard]) -> None:
+REAL_SOURCE_PREFIXES = ("NTSB accident report", "CAROL case")
+SYNTHETIC_PROVENANCE_NOTE = (
+    "SYNTHETIC: real MEL is operator-specific and proprietary (FAA Order 8900.1)"
+)
+
+MANIFEST_NTSB_IDS = {
+    "ERA24FA013",
+    "WPR24FA056",
+    "ERA24FA078",
+    "WPR24FA054",
+}
+
+MANIFEST_CAROL_IDS = {
+    "DCA26WA168",
+    "DCA26WA147",
+    "DCA26LA184",
+    "WPR26FA141",
+    "DCA26WA169",
+    "ERA26LA137",
+    "ERA26FA179",
+}
+
+
+def test_real_cards_cite_verified_source(all_cards: list[TaskCard]) -> None:
+    """Every REAL-tagged card (non-SYNTHETIC source) must cite a manifest-verified
+    NTSB report_id or CAROL record_id."""
     for card in all_cards:
-        assert card.provenance.source == "SYNTHETIC", (
-            f"task_id={card.task_id}: Phase 1 pilot maintenance cards must all be SYNTHETIC; "
-            f"got source={card.provenance.source!r}"
-        )
+        src = card.provenance.source or ""
+        if not src.startswith("SYNTHETIC"):
+            # Must be a real-data card — verify it cites a known manifest entry
+            is_ntsb = any(ntsb_id in src for ntsb_id in MANIFEST_NTSB_IDS)
+            is_carol = any(carol_id in src for carol_id in MANIFEST_CAROL_IDS)
+            assert is_ntsb or is_carol, (
+                f"task_id={card.task_id}: non-SYNTHETIC card source does not cite a "
+                f"manifest-verified NTSB or CAROL ID.\n"
+                f"Source: {src!r}\n"
+                f"Expected one of NTSB IDs: {MANIFEST_NTSB_IDS}\n"
+                f"or CAROL IDs: {MANIFEST_CAROL_IDS}"
+            )
+
+
+def test_real_cards_have_access_date(all_cards: list[TaskCard]) -> None:
+    """Every REAL-tagged card must have an access_date."""
+    for card in all_cards:
+        src = card.provenance.source or ""
+        if not src.startswith("SYNTHETIC"):
+            assert card.provenance.access_date is not None, (
+                f"task_id={card.task_id}: REAL card missing access_date"
+            )
+
+
+def test_synthetic_cards_have_proprietary_note(all_cards: list[TaskCard]) -> None:
+    """Type B/C/D SYNTHETIC cards must include the MEL proprietary provenance note
+    explaining why real MEL data is not available. Type A cards predating T27 are exempt."""
+    for card in all_cards:
+        if card.task_type == "A":
+            continue  # Type A remains fully SYNTHETIC per original T15 brief
+        src = card.provenance.source or ""
+        if src.startswith("SYNTHETIC"):
+            assert SYNTHETIC_PROVENANCE_NOTE in src, (
+                f"task_id={card.task_id}: SYNTHETIC Type B/C/D card source must include the "
+                f"proprietary MEL provenance note.\n"
+                f"Got: {src!r}\n"
+                f"Expected to contain: {SYNTHETIC_PROVENANCE_NOTE!r}"
+            )
 
 
 # ---------------------------------------------------------------------------

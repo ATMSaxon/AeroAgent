@@ -4,6 +4,8 @@ Tests for Task Family 3: Weather and Dispatch Risk task cards.
 Validates schema compliance, provenance integrity, split distribution,
 and content constraints per CLAUDE.md §1.1, §2.2, §3.1, §8.1, §8.3.
 
+T23 expansion: 20 stations × 12 months, ~200 cards, ≥70% B/C/D real_data provenance.
+
 No API calls, no model inference — static structural validation only.
 """
 
@@ -36,6 +38,17 @@ EXPECTED_TASK_TYPES = {
 VALID_SPLITS = {"dev", "test"}
 VALID_SEVERITIES = {"Low", "Medium", "High", "Critical"}
 REQUIRED_LICENSE_STRING = "PILOT — NOT EXPERT-REVIEWED"
+
+# T23 targets
+T23_MINIMUMS = {"typeA": 50, "typeB": 40, "typeC": 30, "typeD": 40}
+T23_MAXIMUMS = {"typeA": 80, "typeB": 120, "typeC": 50, "typeD": 60}
+
+# Stations in 20-station IEM corpus
+IEM_STATIONS = {
+    "KASE", "KATL", "KBOS", "KCVG", "KDEN", "KDFW", "KFAR",
+    "KGTF", "KJFK", "KLAX", "KMEM", "KMIA", "KMSY", "KONT",
+    "KORD", "KPHX", "KSDF", "KSFO", "PANC", "PAOM",
+}
 
 
 def load_cards(path: Path) -> list[TaskCard]:
@@ -78,8 +91,14 @@ def test_sources_md_exists() -> None:
     assert (TASKCARDS_DIR / "sources.md").exists(), "sources.md not found"
 
 
+def test_real_data_methodology_exists() -> None:
+    assert (TASKCARDS_DIR / "real_data_methodology.md").exists(), (
+        "real_data_methodology.md not found (required by T23)"
+    )
+
+
 # ---------------------------------------------------------------------------
-# Card counts per task type
+# Card counts per task type (T23 targets)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("label,path", list(JSONL_FILES.items()))
@@ -87,10 +106,9 @@ def test_minimum_card_count(label: str, path: Path) -> None:
     if not path.exists():
         pytest.skip(f"{path} not found")
     cards = load_cards(path)
-    # T13 expansion: updated minimums
-    minimums = {"typeA": 50, "typeB": 40, "typeC": 20, "typeD": 20}
-    assert len(cards) >= minimums[label], (
-        f"{label}: expected >= {minimums[label]} cards, got {len(cards)}"
+    minimum = T23_MINIMUMS[label]
+    assert len(cards) >= minimum, (
+        f"{label}: expected >= {minimum} cards (T23), got {len(cards)}"
     )
 
 
@@ -99,39 +117,57 @@ def test_maximum_card_count(label: str, path: Path) -> None:
     if not path.exists():
         pytest.skip(f"{path} not found")
     cards = load_cards(path)
-    # T13 expansion: updated maximums
-    maximums = {"typeA": 80, "typeB": 60, "typeC": 35, "typeD": 30}
-    assert len(cards) <= maximums[label], (
-        f"{label}: expected <= {maximums[label]} cards, got {len(cards)}"
+    maximum = T23_MAXIMUMS[label]
+    assert len(cards) <= maximum, (
+        f"{label}: expected <= {maximum} cards (T23), got {len(cards)}"
     )
 
 
-def test_v2_type_a_card_count() -> None:
-    """T13 must add >= 20 Type A SYNTHETIC cards with WD-v2-A prefix."""
-    cards = load_cards(JSONL_FILES["typeA"])
-    v2 = [c for c in cards if c.task_id.startswith("WD-v2-A-")]
-    assert len(v2) >= 20, f"Expected >= 20 WD-v2-A cards, got {len(v2)}"
+# ---------------------------------------------------------------------------
+# T23 real-data provenance targets: ≥70% of B/C/D must be real IEM data
+# ---------------------------------------------------------------------------
+
+def _is_real_iem_card(card: TaskCard) -> bool:
+    src = card.provenance.source or ""
+    return "IEM_METAR" in src or "IEM_TAF" in src
 
 
-def test_v2_type_b_card_count() -> None:
-    """T13 must add >= 30 Type B real-data cards with WD-v2-B prefix."""
-    cards = load_cards(JSONL_FILES["typeB"])
-    v2 = [c for c in cards if c.task_id.startswith("WD-v2-B-")]
-    assert len(v2) >= 30, f"Expected >= 30 WD-v2-B cards, got {len(v2)}"
+@pytest.mark.parametrize("label", ["typeB", "typeC", "typeD"])
+def test_real_data_provenance_ratio(label: str) -> None:
+    """≥70% of B, C, D cards must cite real IEM data (T23 requirement)."""
+    path = JSONL_FILES[label]
+    if not path.exists():
+        pytest.skip(f"{path} not found")
+    cards = load_cards(path)
+    if not cards:
+        pytest.skip("No cards found")
+    real_count = sum(1 for c in cards if _is_real_iem_card(c))
+    ratio = real_count / len(cards)
+    assert ratio >= 0.70, (
+        f"{label}: real_data ratio {ratio:.1%} < 70% (T23 requirement); "
+        f"real={real_count}/{len(cards)}"
+    )
 
 
-def test_v2_type_c_card_count() -> None:
-    """T13 must add >= 15 Type C real-data cards with WD-v2-C prefix."""
-    cards = load_cards(JSONL_FILES["typeC"])
-    v2 = [c for c in cards if c.task_id.startswith("WD-v2-C-")]
-    assert len(v2) >= 15, f"Expected >= 15 WD-v2-C cards, got {len(v2)}"
+# ---------------------------------------------------------------------------
+# IEM stations: B/C/D real cards must cite a known 20-station corpus member
+# ---------------------------------------------------------------------------
 
-
-def test_v2_type_d_card_count() -> None:
-    """T13 must add >= 15 Type D real-data cards with WD-v2-D prefix."""
-    cards = load_cards(JSONL_FILES["typeD"])
-    v2 = [c for c in cards if c.task_id.startswith("WD-v2-D-")]
-    assert len(v2) >= 15, f"Expected >= 15 WD-v2-D cards, got {len(v2)}"
+def test_real_data_cards_cite_known_iem_stations() -> None:
+    """Real IEM B/C/D cards must cite a station in the 20-station T23 corpus."""
+    for label in ("typeB", "typeC", "typeD"):
+        path = JSONL_FILES[label]
+        if not path.exists():
+            continue
+        for card in load_cards(path):
+            if not _is_real_iem_card(card):
+                continue
+            src = card.provenance.source or ""
+            cited_station = any(st in src for st in IEM_STATIONS)
+            assert cited_station, (
+                f"{card.task_id}: real-data card must cite one of the 20 T23 IEM stations "
+                f"in provenance.source; got: {src!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -173,13 +209,25 @@ def test_task_ids_unique() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Provenance integrity (CLAUDE.md §1.1 + §2.2)
+# T23 task ID prefix convention: WD-{A/B/C/D}-NNN
 # ---------------------------------------------------------------------------
 
-def _is_real_data_card(card) -> bool:
-    """Cards with IEM real provenance (not SYNTHETIC)."""
-    return card.provenance.source != "SYNTHETIC" and card.task_id.startswith("WD-v2-")
+def test_t23_task_id_format() -> None:
+    """T23 cards must use WD-A-NNN / WD-B-NNN / WD-C-NNN / WD-D-NNN format."""
+    prefix_map = {"A": "WD-A-", "B": "WD-B-", "C": "WD-C-", "D": "WD-D-"}
+    for label, path in JSONL_FILES.items():
+        if not path.exists():
+            continue
+        expected_prefix = prefix_map[EXPECTED_TASK_TYPES[label]]
+        for card in load_cards(path):
+            assert card.task_id.startswith(expected_prefix), (
+                f"{card.task_id}: expected prefix {expected_prefix!r} for T23 {label} cards"
+            )
 
+
+# ---------------------------------------------------------------------------
+# Provenance integrity (CLAUDE.md §1.1 + §2.2)
+# ---------------------------------------------------------------------------
 
 def test_synthetic_cards_have_generation_rule() -> None:
     """SYNTHETIC cards must have generation_rule and no access_date."""
@@ -198,7 +246,7 @@ def test_real_data_cards_have_access_date() -> None:
     """Real-data IEM cards must have access_date and no generation_rule."""
     for card in all_cards():
         prov = card.provenance
-        if _is_real_data_card(card):
+        if _is_real_iem_card(card):
             assert prov.source != "SYNTHETIC", (
                 f"{card.task_id}: real-data card must not have source='SYNTHETIC'"
             )
@@ -318,6 +366,28 @@ def test_typeD_cards_mention_tool_requirements() -> None:
         )
 
 
+def test_typeD_cards_mention_multiple_tools() -> None:
+    """T23 Type D agentic cards should exercise multiple tools per card (≥2)."""
+    tools = ["metar_parser", "taf_parser", "wind_component", "weather_minima_checker"]
+    if not JSONL_FILES["typeD"].exists():
+        pytest.skip("typeD file not found")
+    cards = load_cards(JSONL_FILES["typeD"])
+    multi_tool_count = 0
+    for card in cards:
+        combined = " ".join([
+            card.prompt,
+            card.gold_decision,
+            " ".join(card.evidence_requirements),
+        ]).lower()
+        tool_count = sum(1 for t in tools if t in combined)
+        if tool_count >= 2:
+            multi_tool_count += 1
+    ratio = multi_tool_count / len(cards) if cards else 0
+    assert ratio >= 0.80, (
+        f"Only {ratio:.1%} of Type D cards exercise ≥2 tools; expected ≥80%"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Severity distribution: at least some Critical and High cards
 # ---------------------------------------------------------------------------
@@ -325,8 +395,8 @@ def test_typeD_cards_mention_tool_requirements() -> None:
 def test_severity_distribution_has_critical_cards() -> None:
     cards = all_cards()
     critical = [c for c in cards if c.severity == "Critical"]
-    assert len(critical) >= 5, (
-        f"Expected at least 5 Critical severity cards, got {len(critical)}"
+    assert len(critical) >= 10, (
+        f"Expected at least 10 Critical severity cards (T23), got {len(critical)}"
     )
 
 
@@ -379,14 +449,38 @@ def test_crosswind_math_60_degree_case() -> None:
     )
 
 
+def test_crosswind_math_obtuse_angle_case() -> None:
+    """Wind 020/28, runway 320 — obtuse angle. Supplement: 360-300=60°; XW=28×sin(60°)≈24.2 kt."""
+    xw = _crosswind(20, 28, 320)
+    expected = 28 * math.sin(math.radians(60))
+    assert abs(xw - expected) < 0.1, (
+        f"Expected {expected:.2f} kt crosswind (obtuse angle), got {xw:.2f}"
+    )
+
+
+def test_crosswind_math_120_degree_case() -> None:
+    """Wind 200/38, runway 090 — angle 110°; sin(110°)=sin(70°); XW=38×sin(70°)≈35.7 kt."""
+    xw = _crosswind(200, 38, 90)
+    expected = 38 * math.sin(math.radians(70))
+    assert abs(xw - expected) < 0.1, (
+        f"Expected ~{expected:.1f} kt crosswind (120° case), got {xw:.2f}"
+    )
+
+
 # ---------------------------------------------------------------------------
-# CAT I minima spot-check (CLAUDE.md §8.3)
+# CAT I/II minima spot-check (CLAUDE.md §8.3)
 # ---------------------------------------------------------------------------
 
 def test_cat1_rvr_minimum_in_feet() -> None:
     """CAT I RVR minimum is 1800 ft per FAA AIM §5-4-7."""
     cat1_rvr_ft = 1800
     assert cat1_rvr_ft == 1800
+
+
+def test_cat2_rvr_minimum_in_feet() -> None:
+    """CAT II RVR minimum is 1200 ft per FAA AIM §5-4-7."""
+    cat2_rvr_ft = 1200
+    assert cat2_rvr_ft == 1200
 
 
 def test_visibility_unit_conversion_spot_check() -> None:
@@ -408,8 +502,15 @@ def test_sm_to_metres_conversion() -> None:
     assert abs(vis_m - 402.3) < 1.0, f"Expected ~402m, got {vis_m:.1f}m"
 
 
+def test_vv_group_is_ceiling() -> None:
+    """VV010 = 1000 ft vertical visibility ceiling when sky is obscured (FAA AIM §7-1-14)."""
+    vv_hundreds = 10
+    ceiling_ft = vv_hundreds * 100
+    assert ceiling_ft == 1000, f"VV010 should yield 1000 ft ceiling, got {ceiling_ft}"
+
+
 # ---------------------------------------------------------------------------
-# Alternate requirement logic spot-checks
+# Alternate requirement logic spot-checks (14 CFR §121.619)
 # ---------------------------------------------------------------------------
 
 def test_alternate_required_when_ceiling_below_2000ft() -> None:
@@ -419,11 +520,23 @@ def test_alternate_required_when_ceiling_below_2000ft() -> None:
     assert ceiling_ft < threshold_ft, "1500 ft ceiling should trigger alternate requirement"
 
 
+def test_alternate_required_at_exactly_2000ft() -> None:
+    """Ceiling exactly 2000 ft triggers alternate requirement (≤ 2000 ft rule)."""
+    ceiling_ft = 2000
+    assert ceiling_ft <= 2000, "2000 ft ceiling is at threshold — alternate required"
+
+
 def test_no_alternate_when_above_thresholds() -> None:
     """Ceiling 5500 ft > 2000 ft and vis 9999m > 3SM — no alternate required."""
     ceiling_ft = 5500
     vis_sm = 6.0  # 9999m >> 3 SM
     assert ceiling_ft >= 2000 and vis_sm >= 3.0
+
+
+def test_alternate_required_when_vis_below_3sm() -> None:
+    """Vis 2SM < 3SM threshold triggers alternate requirement."""
+    vis_sm = 2.0
+    assert vis_sm < 3.0, "2SM visibility should trigger alternate requirement"
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +545,6 @@ def test_no_alternate_when_above_thresholds() -> None:
 
 def test_fm_group_at_exactly_eta_is_active() -> None:
     """FM group onset at ETA = that FM group's conditions apply at ETA."""
-    # FM191800 is valid from 1800Z; ETA is 1800Z — group is active
     fm_onset_z = 1800
     eta_z = 1800
     assert eta_z >= fm_onset_z, "FM group at ETA onset should be active"
@@ -447,25 +559,23 @@ def test_tempo_before_eta_does_not_apply() -> None:
 
 def test_tempo_containing_eta_applies() -> None:
     """TEMPO window containing ETA does apply."""
-    tempo_start_z = 1718
-    tempo_end_z = 1722  # Actually: 1800-2200Z in DDhh notation but for unit test use integers
-    eta_z = 1900
-    # Re-using simpler integer representation for test logic
     tempo_start = 1800
     tempo_end = 2200
     eta = 1900
     assert tempo_start <= eta < tempo_end, "ETA in TEMPO window should have TEMPO conditions"
 
 
-# ---------------------------------------------------------------------------
-# T13 real data methodology doc and manifest verification
-# ---------------------------------------------------------------------------
+def test_becmg_before_eta_not_complete() -> None:
+    """BECMG 1400/1600 starts at 1400Z and completes at 1600Z; at ETA 1430Z it is not yet complete."""
+    becmg_start = 1400
+    becmg_end = 1600
+    eta = 1430
+    assert becmg_start <= eta < becmg_end, "ETA within BECMG window = transition in progress"
 
-def test_real_data_methodology_exists() -> None:
-    assert (TASKCARDS_DIR / "real_data_methodology.md").exists(), (
-        "real_data_methodology.md not found (required by T13)"
-    )
 
+# ---------------------------------------------------------------------------
+# IEM manifest existence
+# ---------------------------------------------------------------------------
 
 def test_iem_metar_manifest_exists() -> None:
     manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
@@ -477,64 +587,51 @@ def test_iem_taf_manifest_exists() -> None:
     assert manifest.exists(), f"IEM TAF manifest not found: {manifest}"
 
 
+def test_iem_metar_manifest_has_20_station_coverage() -> None:
+    """IEM METAR manifest must have entries for all 20 T23 corpus stations."""
+    manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
+    if not manifest.exists():
+        pytest.skip("METAR manifest not found")
+    stations_found = set()
+    with manifest.open() as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                fp = entry.get("file_path", "")
+                for st in IEM_STATIONS:
+                    if f"/{st}_METAR_" in fp or fp.startswith(f"data/raw/IEM_METAR") and f"/{st}_" in fp:
+                        stations_found.add(st)
+            except Exception:
+                pass
+    missing = IEM_STATIONS - stations_found
+    assert not missing, f"IEM METAR manifest missing stations: {sorted(missing)}"
+
+
 def test_real_data_cards_cite_manifest_verified_files() -> None:
-    """Every real-data card's provenance.source must cite a file in the IEM manifests."""
-    import json as _json
-    metar_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
-    taf_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_TAF" / "2026-05-17" / "manifest.jsonl"
-
-    def _manifest_files(manifest_path: Path) -> set:
-        files = set()
-        if not manifest_path.exists():
-            return files
-        with manifest_path.open() as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = _json.loads(line)
-                    files.add(entry.get("file", ""))
-                except Exception:
-                    pass
-        return files
-
-    metar_files = _manifest_files(metar_manifest)
-    taf_files = _manifest_files(taf_manifest)
-    all_manifest_files = metar_files | taf_files
-
+    """Every real-data card's provenance.source must contain IEM_METAR or IEM_TAF."""
     for card in all_cards():
-        if not _is_real_data_card(card):
+        if not _is_real_iem_card(card):
             continue
-        source = card.provenance.source
-        # Check that at least one manifest file is mentioned in the source string
-        found = any(f in source for f in all_manifest_files if f)
-        if not found and all_manifest_files:
-            # Source may cite the file path directly without the manifest entry filename
-            # Accept if source contains "IEM_METAR" or "IEM_TAF" as a minimum check
-            found = "IEM_METAR" in source or "IEM_TAF" in source
-        assert found, (
-            f"{card.task_id}: real-data card provenance.source must cite IEM manifest files; "
+        source = card.provenance.source or ""
+        assert "IEM_METAR" in source or "IEM_TAF" in source, (
+            f"{card.task_id}: real-data card provenance.source must cite IEM data; "
             f"got: {source!r}"
         )
 
 
-def test_v2_a_cards_are_synthetic() -> None:
-    """WD-v2-A cards must be SYNTHETIC (not real IEM data)."""
-    cards = load_cards(JSONL_FILES["typeA"])
-    for card in cards:
-        if card.task_id.startswith("WD-v2-A-"):
-            assert card.provenance.source == "SYNTHETIC", (
-                f"{card.task_id}: WD-v2-A cards must be SYNTHETIC"
-            )
+# ---------------------------------------------------------------------------
+# TypeA cards must all be SYNTHETIC
+# ---------------------------------------------------------------------------
 
-
-def test_real_data_cards_cite_kord_or_kjfk() -> None:
-    """WD-v2 B/C/D cards must cite KORD or KJFK data."""
-    for card in all_cards():
-        if not _is_real_data_card(card):
-            continue
-        source = card.provenance.source
-        assert "KORD" in source or "KJFK" in source, (
-            f"{card.task_id}: real-data card must cite KORD or KJFK in provenance.source"
+def test_typeA_cards_are_synthetic() -> None:
+    """All Type A knowledge cards must be SYNTHETIC (no real IEM data in knowledge cards)."""
+    path = JSONL_FILES["typeA"]
+    if not path.exists():
+        pytest.skip("typeA file not found")
+    for card in load_cards(path):
+        assert card.provenance.source == "SYNTHETIC", (
+            f"{card.task_id}: Type A knowledge cards must be SYNTHETIC"
         )

@@ -260,12 +260,30 @@ def test_synthetic_cards_have_no_access_date(all_cards: list[TaskCard]) -> None:
             )
 
 
-def test_all_cards_are_synthetic(all_cards: list[TaskCard]) -> None:
+def test_real_adsb_cards_have_access_date(all_cards: list[TaskCard]) -> None:
+    """Real ADS-B cards must have an access_date; SYNTHETIC cards must not."""
     for card in all_cards:
-        assert card.provenance.source == "SYNTHETIC", (
-            f"task_id={card.task_id}: Phase 1 pilot ATC separation cards must all be SYNTHETIC; "
-            f"got source={card.provenance.source!r}"
-        )
+        if card.provenance.source != "SYNTHETIC":
+            assert card.provenance.access_date is not None, (
+                f"task_id={card.task_id}: non-SYNTHETIC card missing access_date"
+            )
+
+
+def test_bcd_real_adsb_share(all_cards: list[TaskCard]) -> None:
+    """At least 60% of Type B, C, D cards must cite a real ADS-B Exchange file + timestamp."""
+    bcd_cards = [c for c in all_cards if c.task_type in ("B", "C", "D")]
+    assert bcd_cards, "No B/C/D cards found"
+    real_count = sum(
+        1 for c in bcd_cards
+        if c.provenance.source != "SYNTHETIC"
+        and "acas_" in c.provenance.source or "operations_" in c.provenance.source
+        or "ADS-B Exchange" in c.provenance.source
+    )
+    real_pct = real_count / len(bcd_cards)
+    assert real_pct >= 0.60, (
+        f"Only {real_pct:.1%} of B/C/D cards cite real ADS-B Exchange data; "
+        f"expected >=60% (got {real_count}/{len(bcd_cards)})"
+    )
 
 
 # ---------------------------------------------------------------------------

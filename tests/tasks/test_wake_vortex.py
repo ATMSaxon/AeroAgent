@@ -481,6 +481,98 @@ def test_escalation_sanity_for_critical_cards(all_cards: list[TaskCard]) -> None
 
 
 # ---------------------------------------------------------------------------
+# T26: Real-data search provenance (negative result — 0 wake events in corpus)
+# ---------------------------------------------------------------------------
+
+
+def test_real_data_search_results_doc_exists() -> None:
+    doc = TASKS_DIR / "real_data_search_results.md"
+    assert doc.exists(), (
+        "real_data_search_results.md is missing — T26 requires documenting the "
+        "NTSB corpus text-grep methodology and hit count"
+    )
+    content = doc.read_text()
+    assert "0 wake turbulence" in content.lower() or "zero wake" in content.lower(), (
+        "real_data_search_results.md must document that 0 wake turbulence events were found"
+    )
+
+
+def test_type_bcd_cards_have_real_data_search_field(all_cards: list[TaskCard]) -> None:
+    for card in all_cards:
+        if card.task_type == "A":
+            continue
+        prov = card.provenance
+        prov_dict = prov.model_dump() if hasattr(prov, "model_dump") else vars(prov)
+        has_field = (
+            "real_data_search" in prov_dict
+            or hasattr(prov, "real_data_search")
+        )
+        # Tolerate if stored as extra model field — check raw JSON instead
+        if not has_field:
+            # Re-read raw JSON to check extra fields
+            for task_type, path in TASK_FILES.items():
+                if task_type != card.task_type:
+                    continue
+                with path.open() as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        raw = json.loads(line)
+                        if raw.get("task_id") == card.task_id:
+                            raw_prov = raw.get("provenance", {})
+                            has_field = "real_data_search" in raw_prov
+                            break
+        assert has_field, (
+            f"task_id={card.task_id} (Type {card.task_type}): provenance must include "
+            f"'real_data_search' field documenting the negative NTSB corpus search result "
+            f"(T26 requirement)"
+        )
+
+
+def test_type_bcd_real_data_search_field_not_empty(all_cards: list[TaskCard]) -> None:
+    for card in all_cards:
+        if card.task_type == "A":
+            continue
+        for task_type, path in TASK_FILES.items():
+            if task_type != card.task_type:
+                continue
+            with path.open() as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    raw = json.loads(line)
+                    if raw.get("task_id") == card.task_id:
+                        rds = raw.get("provenance", {}).get("real_data_search", "")
+                        assert len(rds) > 30, (
+                            f"task_id={card.task_id}: real_data_search provenance field is "
+                            f"too short or empty: {rds!r}"
+                        )
+                        break
+
+
+def test_no_fake_real_cards(all_cards: list[TaskCard]) -> None:
+    """No card may claim source='REAL' unless a manifest-verified NTSB report backs it."""
+    for card in all_cards:
+        if card.provenance.source == "REAL":
+            # A REAL card must cite a specific NTSB report in evidence_requirements
+            ev_text = " ".join(card.evidence_requirements)
+            has_ntsb_ref = (
+                "NTSB" in ev_text
+                and any(
+                    re.search(r"[A-Z]{2,3}\d{2}[A-Z]{2}\d{3}", ev)
+                    for ev in card.evidence_requirements
+                )
+            )
+            assert has_ntsb_ref, (
+                f"task_id={card.task_id}: provenance.source='REAL' but no NTSB "
+                f"accident number found in evidence_requirements. "
+                f"If no real case exists, use source='SYNTHETIC'."
+            )
+
+
+# ---------------------------------------------------------------------------
 # Summary report (printed, not asserted)
 # ---------------------------------------------------------------------------
 
