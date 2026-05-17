@@ -1,8 +1,8 @@
 # AeroSafetyEval — Authoritative Data Source Registry
 #
 # Governed by CLAUDE.md §2.1 (Authoritative Sources Only).
-# Every source must include: official URL, license, access method,
-# expected format, citation, last-verified date, and requires_user_action flag.
+# Updated 2026-05-17: added residency_restriction field per PI constraint.
+# All sources on the critical path must have residency_restriction: none.
 #
 # Fields:
 #   source_id: str
@@ -10,22 +10,35 @@
 #   organization: str
 #   official_url: str
 #   license: str
-#   commercial_use_ok: bool | "unknown"  — whether license permits commercial research use
+#   commercial_use_ok: bool | "unknown"
 #   access_method: "direct_download" | "api" | "manual_request" | "web_scrape_permitted"
-#   requires_user_action: bool           — True if user must register, request key, or sign agreement
-#   user_action_description: str | null  — what action is required
-#   expected_format: list[str]           — file formats to expect
-#   estimated_volume: str                — rough order-of-magnitude estimate
-#   task_families: list[int]             — which task families (1–9) this source feeds
-#   citation: str                        — standard citation text
-#   last_verified: str                   — YYYY-MM-DD, date URL/license was last checked
-#   notes: str                           — any special constraints or caveats
-#   enabled: bool                        — set to false until team-lead green-lights download
+#   requires_user_action: bool           — True if registration/key/agreement required
+#   residency_restriction: str           — none | us_resident | eu_member | commercial_license
+#     "none"               = publicly accessible globally, no residency gate
+#     "us_resident"        = US-based API keys, US-only access restrictions, or
+#                            ToS implying US-resident status required
+#     "eu_member"          = requires EU/ECAC membership or institutional access
+#     "commercial_license" = requires paid license regardless of residency
+#   critical_path: bool                  — true if on the pilot-task critical path
+#   alternative_source_id: str | null    — if not critical_path, which source replaces it
+#   user_action_description: str | null
+#   expected_format: list[str]
+#   estimated_volume: str
+#   task_families: list[int]
+#   citation: str
+#   last_verified: str                   — YYYY-MM-DD
+#   notes: str
+#   enabled: bool                        — false until team-lead green-lights download
 
-schema_version: "1.0.0"
+schema_version: "1.2.0"
 created: "2026-05-17"
+updated: "2026-05-17"
 author: "data-curator"
 governed_by: "CLAUDE.md §2.1, proposal §9.2"
+
+# ============================================================================
+# CRITICAL-PATH SOURCES (residency_restriction: none, no registration)
+# ============================================================================
 
 sources:
 
@@ -40,6 +53,9 @@ sources:
     commercial_use_ok: true
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "txt"
@@ -52,15 +68,13 @@ sources:
       Available at: https://asrs.arc.nasa.gov
     last_verified: "2026-05-17"
     notes: >
-      Reports are de-identified; no personally identifiable information.
-      Download via the ASRS database search (bulk download available in CSV).
-      Narratives may contain reporter-supplied information not independently verified.
-      Mark all ASRS-derived records with source_type=ASRS_VOLUNTARY_REPORT.
+      Reports are de-identified. Download via ASRS database search (bulk CSV).
+      Mark all derived records with source_type=ASRS_VOLUNTARY_REPORT.
     enabled: false
 
   # ── 2. NTSB Aviation Accident Database ────────────────────────────────────
   - source_id: "NTSB_ACCIDENT_DB"
-    name: "NTSB Aviation Accident and Incident Data System (CADREP/AIDES)"
+    name: "NTSB Aviation Accident and Incident Data (CAROL query system)"
     organization: "National Transportation Safety Board"
     official_url: "https://www.ntsb.gov/Pages/AviationQueryV2.aspx"
     license: >
@@ -68,25 +82,27 @@ sources:
     commercial_use_ok: true
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "xml"
       - "csv"
       - "txt"
     estimated_volume: >
-      ~80,000+ accident/incident records (dating to 1962);
-      full narrative reports available for major accidents.
+      ~80,000+ accident/incident records (dating to 1962).
+      Full narrative reports available for major accidents.
     task_families: [2]
     citation: >
       National Transportation Safety Board (NTSB).
-      Aviation Accident Database and Synopses.
+      Aviation Accident Database and Synopses (CAROL).
       Available at: https://www.ntsb.gov/Pages/AviationQueryV2.aspx
     last_verified: "2026-05-17"
     notes: >
-      Structured data (CSV) available for bulk download.
-      Full probable cause narrative reports available as individual txt/PDF pages.
-      Use structured CSV fields (event_type, phase_of_flight, probable_cause_text)
-      as primary extraction targets. Do not infer probable cause beyond what NTSB states.
+      Structured CSV available for bulk download.
+      Full narrative PDFs available per event via CAROL web UI.
+      Do not infer probable cause beyond what NTSB states.
     enabled: false
 
   # ── 3. NTSB Full Accident Reports (PDF) ───────────────────────────────────
@@ -99,6 +115,9 @@ sources:
     commercial_use_ok: true
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "pdf"
@@ -112,11 +131,250 @@ sources:
     last_verified: "2026-05-17"
     notes: >
       Full reports provide richer narrative for causal chain reconstruction.
-      PDF parsing required; preserve original structure.
       Limit to reports with structured probable cause sections.
     enabled: false
 
-  # ── 4. FAA Aviation Safety Hotline / Service Difficulty Reporting ─────────
+  # ── 4. Iowa State Mesonet — METAR Archive (primary METAR source) ────────────
+  - source_id: "IEM_METAR"
+    name: "Iowa Environmental Mesonet (IEM) — ASOS/METAR Archive"
+    organization: "Iowa State University / NOAA mirror"
+    official_url: "https://mesonet.agron.iastate.edu/request/download.phtml"
+    license: >
+      Public domain. Data originates from NOAA/NWS public feeds.
+      IEM Terms of Service: https://mesonet.agron.iastate.edu/info/tos.phtml
+      No registration required. Globally accessible.
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
+    expected_format:
+      - "csv"
+    estimated_volume: >
+      Hundreds of millions of global METAR observations.
+      Filter by station ICAO code and date range.
+    task_families: [3]
+    citation: >
+      Iowa Environmental Mesonet (IEM), Iowa State University.
+      ASOS-METAR Archive.
+      Available at: https://mesonet.agron.iastate.edu/request/download.phtml
+      Underlying data: NOAA/NWS.
+    last_verified: "2026-05-17"
+    notes: >
+      Rate limit: no more than 300 requests/hour per IP (see TOS).
+      Use 12-second inter-request delay. No API key, no registration.
+      Replaces NOAA_AWC_API (aviationweather.gov) from prior registry version —
+      IEM provides the same underlying NOAA/NWS data without residency gating
+      and with a deeper historical archive.
+      Endpoint: https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py
+      Use report_type=3 for METAR observations.
+      See IEM_TAF (entry below) for Terminal Aerodrome Forecasts.
+      Select priority high-traffic airports (KLAX, KJFK, KORD, KATL, EGLL, RJTT, etc.).
+    enabled: false
+
+  # ── 5. Iowa State Mesonet — TAF Archive (primary TAF source) ─────────────
+  - source_id: "IEM_TAF"
+    name: "Iowa Environmental Mesonet (IEM) — TAF Archive"
+    organization: "Iowa State University / NOAA mirror"
+    official_url: "https://mesonet.agron.iastate.edu/request/download.phtml"
+    license: >
+      Public domain. Data originates from NOAA/NWS public feeds.
+      IEM Terms of Service: https://mesonet.agron.iastate.edu/info/tos.phtml
+      No registration required. Globally accessible.
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: "OGIMET_TAF"
+    user_action_description: null
+    expected_format:
+      - "csv"
+    estimated_volume: >
+      TAF issued ~4×/day per station; years of historical records per airport.
+      Filter by station ICAO code and date range.
+    task_families: [3]
+    citation: >
+      Iowa Environmental Mesonet (IEM), Iowa State University.
+      TAF Archive.
+      Available at: https://mesonet.agron.iastate.edu/request/download.phtml
+      Underlying data: NOAA/NWS.
+    last_verified: "2026-05-17"
+    notes: >
+      Substitutes for NOAA_AWC_API (aviationweather.gov/data/api/ TAF endpoint),
+      which has a us_resident residency restriction. IEM provides the same
+      underlying NOAA/NWS TAF data without any residency gate or API key.
+      Endpoint: https://mesonet.agron.iastate.edu/cgi-bin/request/taf.py
+      Parameters: station=ICAO, year1/month1/day1, year2/month2/day2, tz=UTC, format=csv.
+      Rate limit: shared 300 req/hr cap with IEM_METAR — same 12-second delay applies.
+      Fallback: OGIMET_TAF for non-US stations not covered by IEM.
+    enabled: false
+
+  # ── 6. OGIMET — METAR/SYNOP Archive (secondary METAR/TAF source) ──────────
+  - source_id: "OGIMET_METAR"
+    name: "OGIMET — World Meteorological Data (METAR/SYNOP archive)"
+    organization: "OGIMET (independent meteorological data service, Spain)"
+    official_url: "https://www.ogimet.com/metars.phtml.en"
+    license: >
+      Data originates from WMO Global Telecommunication System (GTS) public feeds.
+      OGIMET itself imposes no formal license on access; data is public meteorological
+      information. Use respectfully with crawl delay.
+    commercial_use_ok: "unknown"
+    access_method: "web_scrape_permitted"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: false
+    alternative_source_id: "IEM_METAR"
+    user_action_description: null
+    expected_format:
+      - "html"
+      - "text"
+    estimated_volume: "Global METAR archive; years of historical data per station"
+    task_families: [3]
+    citation: >
+      OGIMET World Meteorological Information Service.
+      Available at: https://www.ogimet.com
+      Underlying data: WMO/GTS public feeds.
+    last_verified: "2026-05-17"
+    notes: >
+      Secondary METAR source; use IEM_METAR on critical path.
+      Useful as a cross-check or fallback for non-US stations not in IEM.
+      Respect crawl delays (minimum 5 seconds between requests).
+    enabled: false
+
+  # ── 7. OGIMET — TAF Archive (secondary TAF fallback) ─────────────────────
+  - source_id: "OGIMET_TAF"
+    name: "OGIMET — Terminal Aerodrome Forecast (TAF) Archive"
+    organization: "OGIMET (independent meteorological data service, Spain)"
+    official_url: "https://www.ogimet.com/tafs.phtml.en"
+    license: >
+      Data originates from WMO GTS public feeds. No formal license imposed by OGIMET.
+    commercial_use_ok: "unknown"
+    access_method: "web_scrape_permitted"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: false
+    alternative_source_id: "IEM_TAF"
+    user_action_description: null
+    expected_format:
+      - "html"
+      - "text"
+    estimated_volume: "Global TAF archive per station"
+    task_families: [3]
+    citation: >
+      OGIMET World Meteorological Information Service — TAF Archive.
+      Available at: https://www.ogimet.com/tafs.phtml.en
+      Underlying data: WMO/GTS public feeds.
+    last_verified: "2026-05-17"
+    notes: >
+      Secondary TAF source; use IEM_TAF on critical path.
+      Fallback for non-US stations not in IEM TAF archive.
+      Respect crawl delays (minimum 5 seconds between requests).
+    enabled: false
+
+  # ── 8. FAA Published Documents (Order 7110.65, AIM, JO 7930.2, AC series) ─
+  - source_id: "FAA_DOCS"
+    name: "FAA Published Orders, AIM, Advisory Circulars, and NOTAMs Reference"
+    organization: "Federal Aviation Administration"
+    official_url: "https://www.faa.gov/air_traffic/publications/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
+    expected_format:
+      - "pdf"
+      - "html"
+    estimated_volume: >
+      Dozens of key documents. Priority list:
+        JO 7110.65 (ATC Order — wake turbulence, separation),
+        JO 7930.2 (NOTAM system — format reference and examples),
+        AIM (Aeronautical Information Manual),
+        AC 120-92B (SMS), AC 60-22 (ADM), AC 43-16A (maintenance error),
+        AC 120-16G (CAMP), AC 00-6B (aviation weather),
+        AC 00-45H (aviation weather services),
+        AC 150/5300-13A (airport design).
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Air Traffic Publications and Advisory Circulars.
+      Available at: https://www.faa.gov/air_traffic/publications/
+    last_verified: "2026-05-17"
+    notes: >
+      JO 7930.2 is the key reference for NOTAM format examples —
+      Chapter 1 defines NOTAM structure; Appendices contain annotated examples.
+      This replaces FAA_NOTAM_API (removed: residency_restriction=us_resident)
+      for the purpose of KP extraction and format grounding.
+      Real NOTAM volume for Task Family 4 will come from ADS-B Exchange NOTAM
+      feed (see ADSB_EXCHANGE) or ICAO Annex 15 worked examples.
+    enabled: false
+
+  # ── 9. eCFR Title 14 — Code of Federal Regulations ───────────────────────
+  - source_id: "FAA_CFR14"
+    name: "Title 14 Code of Federal Regulations (Aeronautics and Space)"
+    organization: "Federal Aviation Administration / GPO"
+    official_url: "https://www.ecfr.gov/current/title-14"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
+    expected_format:
+      - "xml"
+      - "html"
+      - "json"
+    estimated_volume: "14 CFR Parts 1–199; select relevant Parts (1, 61, 91, 121, 135, 139)"
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    citation: >
+      Code of Federal Regulations, Title 14 — Aeronautics and Space.
+      Electronic Code of Federal Regulations (eCFR).
+      Available at: https://www.ecfr.gov/current/title-14
+    last_verified: "2026-05-17"
+    notes: >
+      Use eCFR XML bulk download or eCFR API (no key required).
+      Priority Parts: 1 (Definitions), 61, 91, 121, 135, 139.
+      Preserve Part + Section + revision date in provenance.
+    enabled: false
+
+  # ── 10. FAA Airport Diagrams ───────────────────────────────────────────────
+  - source_id: "FAA_AIRPORT_DIAGRAMS"
+    name: "FAA Aeronautical Information Services — Airport Diagrams (d-TPP)"
+    organization: "Federal Aviation Administration"
+    official_url: "https://aeronav.faa.gov/d-tpp/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
+    expected_format:
+      - "pdf"
+    estimated_volume: "~800+ U.S. airports; published in 28-day AIRAC cycles"
+    task_families: [5]
+    citation: >
+      Federal Aviation Administration (FAA), Aeronautical Information Services.
+      Digital Terminal Procedures Publication (d-TPP) — Airport Diagrams.
+      Available at: https://aeronav.faa.gov/d-tpp/
+    last_verified: "2026-05-17"
+    notes: >
+      Download individual airport diagram PDFs by AIRAC cycle + ICAO code.
+      Preserve AIRAC cycle number and effective date in provenance.
+    enabled: false
+
+  # ── 11. FAA SDR Database ───────────────────────────────────────────────────
   - source_id: "FAA_SDR"
     name: "FAA Service Difficulty Reporting (SDR) Database"
     organization: "Federal Aviation Administration"
@@ -126,6 +384,9 @@ sources:
     commercial_use_ok: true
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "csv"
@@ -138,365 +399,124 @@ sources:
       Available at: https://av-info.faa.gov/sdrx/
     last_verified: "2026-05-17"
     notes: >
-      SDR records describe maintenance discrepancies reported by certificate holders.
-      Useful for Task Family 8 (maintenance release) KP extraction.
       Fields include aircraft make/model, ATA chapter, difficulty description, remedy.
+      Useful for Task Family 8 (maintenance release) KP extraction.
     enabled: false
 
-  # ── 5. NOAA METAR Archive ──────────────────────────────────────────────────
-  - source_id: "NOAA_METAR"
-    name: "NOAA Iowa Environmental Mesonet (IEM) METAR Archive"
-    organization: "Iowa State University / NOAA"
-    official_url: "https://mesonet.agron.iastate.edu/request/download.phtml"
-    license: >
-      Public domain; data originates from NOAA/NWS public feeds.
-      IEM access terms: https://mesonet.agron.iastate.edu/info/tos.phtml
-    commercial_use_ok: true
-    access_method: "api"
-    requires_user_action: false
-    user_action_description: null
-    expected_format:
-      - "csv"
-      - "json"
-    estimated_volume: "Hundreds of millions of METAR observations globally; select by station and date range"
-    task_families: [3]
-    citation: >
-      Iowa Environmental Mesonet (IEM), Iowa State University.
-      ASOS-METAR Archive.
-      Available at: https://mesonet.agron.iastate.edu/request/download.phtml
-      Data sourced from NOAA/NWS.
-    last_verified: "2026-05-17"
-    notes: >
-      Rate limit: documented at https://mesonet.agron.iastate.edu/info/tos.phtml
-      Use the IEM ASOS download service with station + date range filters.
-      Select specific high-traffic airports (KLAX, KJFK, KORD, KATL, EGLL, RJTT).
-      Do not bulk-download all stations without team-lead approval.
-      Store raw METAR strings with station_id + observation_timestamp.
-    enabled: false
-
-  # ── 6. NOAA Aviation Weather Center TAF ───────────────────────────────────
-  - source_id: "NOAA_TAF"
-    name: "NOAA Aviation Weather Center — TAF Archive"
-    organization: "NOAA / National Weather Service"
-    official_url: "https://aviationweather.gov/data/api/"
-    license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
-    access_method: "api"
-    requires_user_action: false
-    user_action_description: null
-    expected_format:
-      - "json"
-      - "xml"
-      - "text"
-    estimated_volume: "TAF updated 4× daily per station; historical archive via API query"
-    task_families: [3]
-    citation: >
-      NOAA Aviation Weather Center (AWC).
-      Terminal Aerodrome Forecast (TAF) Data API.
-      Available at: https://aviationweather.gov/data/api/
-    last_verified: "2026-05-17"
-    notes: >
-      Use the AWC Data API (https://aviationweather.gov/data/api/) with TAF endpoint.
-      Respect documented request rate limits.
-      Pair with METAR records for same station and time window for Task Family 3.
-    enabled: false
-
-  # ── 7. FAA NOTAM System ────────────────────────────────────────────────────
-  - source_id: "FAA_NOTAM"
-    name: "FAA NOTAM Search (NOTAM Management System)"
+  # ── 12. FAA MMEL Documents ─────────────────────────────────────────────────
+  - source_id: "FAA_MMEL"
+    name: "FAA Master Minimum Equipment List (MMEL) Documents"
     organization: "Federal Aviation Administration"
-    official_url: "https://notams.aim.faa.gov/notamSearch/"
+    official_url: "https://rgl.faa.gov/Regulatory_and_Guidance_Library/rgMakeModel.nsf/0/MainFrameSet"
     license: >
       Public domain (U.S. Government work, 17 U.S.C. §105).
     commercial_use_ok: true
-    access_method: "api"
-    requires_user_action: true
-    user_action_description: >
-      FAA provides a NOTAM API (https://api.faa.gov/notamapi/). Requires free API key
-      registration at https://api.faa.gov. Account creation required (no cost).
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
     expected_format:
-      - "json"
-    estimated_volume: "Millions of NOTAMs; filter by airport ICAO code and date range"
-    task_families: [4]
+      - "pdf"
+    estimated_volume: "~200+ MMEL documents; select B737-NG, B777, A320, A350"
+    task_families: [8]
     citation: >
       Federal Aviation Administration (FAA).
-      NOTAM Management System / NOTAM Search.
-      Available at: https://notams.aim.faa.gov/notamSearch/
-      API: https://api.faa.gov/notamapi/
+      Master Minimum Equipment List (MMEL) — Regulatory Guidance Library.
+      Available at: https://rgl.faa.gov/
     last_verified: "2026-05-17"
     notes: >
-      The FAA NOTAM API (api.faa.gov) provides programmatic access to current and
-      archived NOTAMs. Rate limits and terms: https://api.faa.gov/terms-and-conditions
-      For historical NOTAM snapshots, supplement with ICAO AIS portals (see ICAO_NOTAM source).
-      Log every API call with request parameters, timestamp, and response code.
+      Individual MMEL PDFs retrieved by aircraft make/model from the RGL system.
+      Actual PDF URLs require navigating the RGL index — verify before enabling.
+      Extract MEL category (A/B/C/D), O-item, M-item as structured KPs.
     enabled: false
 
-  # ── 8. ICAO AIS — International NOTAM data ────────────────────────────────
-  - source_id: "ICAO_NOTAM"
-    name: "ICAO NOTAM / AIS Data (ICAO SWIM / International NOTAMs)"
-    organization: "International Civil Aviation Organization"
-    official_url: "https://www.icao.int/safety/information-management/Pages/SWIM.aspx"
-    license: >
-      ICAO data use is governed by ICAO's data policy.
-      Some NOTAM data accessible via bilateral AIS agreements or national AIS portals.
-      Consult ICAO Doc 8585 and national AIS authority for specific license terms.
-    commercial_use_ok: "unknown"
-    access_method: "manual_request"
-    requires_user_action: true
-    user_action_description: >
-      International NOTAM data (ICAO SWIM) requires coordination with national AIS
-      authorities. For research purposes, contact individual national AIS providers
-      (e.g., UK NATS, Eurocontrol B2B services). Eurocontrol B2B requires network
-      membership: https://www.eurocontrol.int/service/network-manager-business-business-b2b-web-services
-    expected_format:
-      - "AIXM 5.1"
-      - "json"
-      - "NOTAM plain text"
-    estimated_volume: "Varies by region and time range"
-    task_families: [4]
-    citation: >
-      International Civil Aviation Organization (ICAO).
-      Aeronautical Information Services (AIS) / SWIM.
-      Available at: https://www.icao.int/safety/information-management/Pages/SWIM.aspx
-    last_verified: "2026-05-17"
-    notes: >
-      Use FAA_NOTAM source primarily for U.S. operations.
-      For international coverage, use this source with appropriate institutional access.
-      Mark all ICAO NOTAM data with originating AIS authority.
-    enabled: false
-
-  # ── 9. OpenSky Network — ADS-B Trajectories ───────────────────────────────
+  # ── 11. OpenSky Network — ADS-B Trajectories ──────────────────────────────
   - source_id: "OPENSKY_ADSB"
-    name: "OpenSky Network — Historical ADS-B Data"
-    organization: "OpenSky Network (open-source research consortium)"
+    name: "OpenSky Network — Historical ADS-B Data (Impala/Trino)"
+    organization: "OpenSky Network (EU-hosted open research consortium)"
     official_url: "https://opensky-network.org/data/impala"
     license: >
       OpenSky Network Data License Agreement.
-      Academic / research use permitted without charge.
-      Commercial use requires separate agreement.
+      Academic/research use: free, no residency restriction.
+      Impala/Trino access open to academic users globally (not US-gated).
       Full terms: https://opensky-network.org/about/terms-of-use
     commercial_use_ok: false
     access_method: "api"
     requires_user_action: true
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: >
-      Requires free registration at https://opensky-network.org/register.
-      Impala cluster access for historical data requires additional request via
-      https://opensky-network.org/data/impala (academic credential may be required).
+      Free registration at https://opensky-network.org/register.
+      No residency restriction — EU-hosted, globally accessible.
+      Impala/Trino SSH access for historical data: request via
+      https://opensky-network.org/data/impala (academic credential may expedite).
     expected_format:
       - "parquet"
       - "csv"
-    estimated_volume: "Billions of ADS-B state vectors; filter by airport/ICAO + date range"
+    estimated_volume: "Billions of ADS-B state vectors; filter by bounding box + date"
     task_families: [6]
     citation: >
-      Matthias Schäfer, Martin Strohmeier, Vincent Lenders, Ivan Martinovic, Matthias Wilhelm.
-      Bringing Up OpenSky: A Large-scale ADS-B Sensor Network for Research.
-      IPSN-14, April 2014.
+      Matthias Schäfer, Martin Strohmeier, Vincent Lenders, Ivan Martinovic,
+      Matthias Wilhelm. Bringing Up OpenSky: A Large-scale ADS-B Sensor Network
+      for Research. IPSN-14, April 2014.
       Available at: https://opensky-network.org
     last_verified: "2026-05-17"
     notes: >
+      EU-hosted, no US residency gate. Requires free account registration.
       Use traffic library (https://traffic-viz.github.io/) for trajectory processing.
-      Restrict to terminal area trajectories (within ~50 NM of selected airports).
-      ADS-B data quality varies; flag records with low message rate or position anomalies.
-      ADSB-derived positions are not certified navigation data.
+      Restrict to terminal area bounding boxes (~50 NM radius).
     enabled: false
 
-  # ── 10. EUROCONTROL PRISME / DDS ──────────────────────────────────────────
-  - source_id: "EUROCONTROL_DDS"
-    name: "EUROCONTROL Data Demand Service (DDS) / Network Statistics"
-    organization: "EUROCONTROL"
-    official_url: "https://www.eurocontrol.int/service/data-demand-service"
+  # ── 12. ADS-B Exchange — ADS-B Archive ────────────────────────────────────
+  - source_id: "ADSB_EXCHANGE"
+    name: "ADS-B Exchange — Crowd-sourced ADS-B Archive"
+    organization: "ADS-B Exchange (community project)"
+    official_url: "https://www.adsbexchange.com/data/"
     license: >
-      EUROCONTROL Data Policy; research access available under specific agreements.
-      Public statistical data freely available.
-      Raw flight data requires Network Member or research agreement.
-      Terms: https://www.eurocontrol.int/sites/default/files/2019-06/eurocontrol-data-policy.pdf
+      ADS-B Exchange data is community-contributed.
+      Historical archive access: some data available via direct download.
+      Full terms: https://www.adsbexchange.com/legal/terms-of-service/
+      Research access: contact hello@adsbexchange.com.
     commercial_use_ok: false
-    access_method: "manual_request"
-    requires_user_action: true
-    user_action_description: >
-      Public aggregated statistics are downloadable from the EUROCONTROL Statistics portal
-      (https://www.eurocontrol.int/our-data). For raw trajectory data, apply via
-      EUROCONTROL Research Collaboration: https://www.eurocontrol.int/network-manager/research
-    expected_format:
-      - "csv"
-      - "xlsx"
-      - "BADA aircraft performance"
-    estimated_volume: "Millions of flight records annually; select by ECAC area and date"
-    task_families: [6, 9]
-    citation: >
-      EUROCONTROL Network Manager.
-      EUROCONTROL Data Demand Service / Aviation Network Statistics.
-      Available at: https://www.eurocontrol.int/our-data
-    last_verified: "2026-05-17"
-    notes: >
-      BADA (Base of Aircraft Data) aircraft performance data requires separate license.
-      For Task Family 6 (ATC separation), use public STATFOR data for volume context;
-      use OpenSky for trajectory-level data unless EUROCONTROL access is obtained.
-    enabled: false
-
-  # ── 11. FAA Advisory Circulars ────────────────────────────────────────────
-  - source_id: "FAA_AC"
-    name: "FAA Advisory Circulars (AC)"
-    organization: "Federal Aviation Administration"
-    official_url: "https://www.faa.gov/regulations_policies/advisory_circulars/"
-    license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: false
+    alternative_source_id: "OPENSKY_ADSB"
     user_action_description: null
     expected_format:
-      - "pdf"
-      - "html"
-    estimated_volume: "~1,500+ ACs across all subject areas; select relevant AC numbers"
-    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    citation: >
-      Federal Aviation Administration (FAA).
-      Advisory Circulars.
-      Available at: https://www.faa.gov/regulations_policies/advisory_circulars/
-    last_verified: "2026-05-17"
-    notes: >
-      Select ACs relevant to each task family. Priority list:
-        AC 120-92B (SMS), AC 60-22 (Aeronautical Decision Making),
-        AC 43-16A (Maintenance error), AC 120-16G (CAMP),
-        AC 91-36D (VFR waypoints), AC 00-6B (Aviation Weather),
-        AC 00-45H (Aviation Weather Services).
-      Download individual PDFs by AC number. Preserve AC number + issue date in provenance.
-    enabled: false
-
-  # ── 12. FAA Federal Aviation Regulations (CFR Title 14) ───────────────────
-  - source_id: "FAA_CFR14"
-    name: "Title 14 Code of Federal Regulations (Aeronautics and Space)"
-    organization: "Federal Aviation Administration / GPO"
-    official_url: "https://www.ecfr.gov/current/title-14"
-    license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
-    access_method: "direct_download"
-    requires_user_action: false
-    user_action_description: null
-    expected_format:
-      - "xml"
-      - "html"
       - "json"
-    estimated_volume: "14 CFR Parts 1–199 and Parts 200–1199; select relevant Parts"
-    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      - "parquet"
+    estimated_volume: "Global ADS-B; sample archives available per day"
+    task_families: [6]
     citation: >
-      Code of Federal Regulations, Title 14 — Aeronautics and Space.
-      Electronic Code of Federal Regulations (eCFR).
-      Available at: https://www.ecfr.gov/current/title-14
+      ADS-B Exchange.
+      Available at: https://www.adsbexchange.com/data/
     last_verified: "2026-05-17"
     notes: >
-      Use eCFR API or bulk XML download for structured rule extraction.
-      Priority Parts: 1 (Definitions), 61, 91, 121, 135, 139.
-      Preserve Part + Section + revision date in provenance.
-      Rules change; always store the version date.
+      Secondary ADS-B source; use OPENSKY_ADSB on critical path.
+      ADS-B Exchange historical sample files (JSON per aircraft per day)
+      are available at https://www.adsbexchange.com/data/ without registration.
+      Useful for cross-validation or gap-filling.
     enabled: false
 
-  # ── 13. ICAO Documents ────────────────────────────────────────────────────
-  - source_id: "ICAO_DOCS"
-    name: "ICAO Annexes and PANS Documents"
-    organization: "International Civil Aviation Organization"
-    official_url: "https://store.icao.int/"
-    license: >
-      ICAO copyright. Purchase required for most documents.
-      Some documents available free (selected Safety Management documents).
-      ICAO Doc 9859 (SMS Manual, 4th ed.) free: https://www.icao.int/safety/SafetyManagement/Pages/GuidanceDocuments.aspx
-    commercial_use_ok: false
-    access_method: "manual_request"
-    requires_user_action: true
-    user_action_description: >
-      Most ICAO Annexes and PANS (Doc 4444, Annex 3, Annex 13, etc.) require purchase
-      from ICAO Store (https://store.icao.int/). Institutional access may be available
-      via university library ICAO subscription. ICAO Doc 9859 (Safety Management Manual)
-      is available free at the URL above.
-    expected_format:
-      - "pdf"
-    estimated_volume: "Dozens of key documents; select by task family"
-    task_families: [1, 2, 3, 4, 5, 6, 7, 8]
-    citation: >
-      International Civil Aviation Organization (ICAO).
-      [Specific document title, Doc number, edition].
-      Montreal: ICAO, [year].
-    last_verified: "2026-05-17"
-    notes: >
-      Priority documents:
-        Annex 3 (Meteorology), Annex 13 (Accident Investigation),
-        Annex 15 (AIS/NOTAM), Annex 16 (Environmental Protection — not primary),
-        Doc 4444 PANS-ATM (Separation), Doc 9859 (SMS, free), Doc 9870 (Runway Incursion).
-      Verify institution has licensed copies before extracting text.
-      Mark provenance with Doc number + edition + year.
-    enabled: false
-
-  # ── 14. FAA Airport Diagrams ──────────────────────────────────────────────
-  - source_id: "FAA_AIRPORT_DIAGRAMS"
-    name: "FAA Aeronautical Information Services — Airport Diagrams"
-    organization: "Federal Aviation Administration"
-    official_url: "https://aeronav.faa.gov/d-tpp/AirportDiagrams.pdf"
-    license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
-    access_method: "direct_download"
-    requires_user_action: false
-    user_action_description: null
-    expected_format:
-      - "pdf"
-      - "georeferenced PDF"
-    estimated_volume: "~800+ U.S. airports with published diagrams"
-    task_families: [5]
-    citation: >
-      Federal Aviation Administration (FAA), Aeronautical Information Services (AIS).
-      Airport/Facility Directory (A/FD) — Airport Diagrams.
-      Available at: https://aeronav.faa.gov/d-tpp/AirportDiagrams.pdf
-    last_verified: "2026-05-17"
-    notes: >
-      Airport diagrams are published in 28-day AIRAC cycles.
-      Download the current d-TPP cycle PDF or individual airport diagram PDFs.
-      FAA also publishes georeferenced digital obstacle files and airport data at:
-      https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/
-      Use for Task Family 5 (airport surface operations) multimodal tasks.
-      Preserve AIRAC cycle and effective date in provenance.
-    enabled: false
-
-  # ── 15. FAA Wake Turbulence / Aircraft Type Data ──────────────────────────
-  - source_id: "FAA_WAKE_CATEGORIES"
-    name: "FAA Wake Turbulence Aircraft Category Tables (Order JO 7110.65 / RECAT)"
-    organization: "Federal Aviation Administration"
-    official_url: "https://www.faa.gov/air_traffic/publications/atpubs/atc_html/"
-    license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
-    access_method: "direct_download"
-    requires_user_action: false
-    user_action_description: null
-    expected_format:
-      - "html"
-      - "pdf"
-    estimated_volume: "Tables within ATC manual chapters; structured extraction required"
-    task_families: [7]
-    citation: >
-      Federal Aviation Administration (FAA).
-      Air Traffic Control (ATC) Order JO 7110.65 — Air Traffic Control.
-      Available at: https://www.faa.gov/air_traffic/publications/atpubs/atc_html/
-    last_verified: "2026-05-17"
-    notes: >
-      Wake turbulence separation tables are in Chapter 5 (Radar) of JO 7110.65.
-      RECAT-US (FAA Order JO 7110.659) provides updated categories.
-      Extract aircraft type → category mappings as structured YAML/JSON.
-      For LiDAR wake data, see LLWAS and research datasets (separate source).
-    enabled: false
-
-  # ── 16. EUROCONTROL RECAT-EU ──────────────────────────────────────────────
+  # ── 13. EUROCONTROL RECAT-EU — Wake Turbulence Categorisation ─────────────
   - source_id: "EUROCONTROL_RECAT"
     name: "EUROCONTROL RECAT-EU Wake Turbulence Categorisation"
     organization: "EUROCONTROL"
     official_url: "https://www.eurocontrol.int/concept/recat-eu"
     license: >
-      EUROCONTROL public guidance; publicly available documents.
+      EUROCONTROL public guidance document. Freely downloadable.
+      No registration required.
     commercial_use_ok: "unknown"
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "pdf"
@@ -509,119 +529,230 @@ sources:
       Available at: https://www.eurocontrol.int/concept/recat-eu
     last_verified: "2026-05-17"
     notes: >
-      RECAT-EU defines 6 categories (A–F) for European operations.
-      Cross-reference with FAA RECAT-US for comparative task construction.
+      Defines 6 categories (A–F) for European operations.
+      Cross-reference with FAA RECAT-US tables from FAA_DOCS (JO 7110.65).
     enabled: false
 
-  # ── 17. FAA Minimum Equipment List / MMEL ─────────────────────────────────
-  - source_id: "FAA_MMEL"
-    name: "FAA Master Minimum Equipment List (MMEL) Documents"
-    organization: "Federal Aviation Administration"
-    official_url: "https://rgl.faa.gov/Regulatory_and_Guidance_Library/rgMakeModel.nsf/0/MainFrameSet"
+  # ── 14. ICAO Doc 8643 — Aircraft Type Designators ─────────────────────────
+  - source_id: "ICAO_DOC8643"
+    name: "ICAO Doc 8643 — Aircraft Type Designators"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://www.icao.int/publications/doc8643/Pages/default.aspx"
     license: >
-      Public domain (U.S. Government work, 17 U.S.C. §105).
-    commercial_use_ok: true
+      ICAO Doc 8643 data (aircraft type / wake turbulence designators)
+      is freely searchable and downloadable from the ICAO website without
+      registration or purchase.
+    commercial_use_ok: "unknown"
     access_method: "direct_download"
     requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
+    expected_format:
+      - "html"
+      - "csv"
+    estimated_volume: "~10,000+ aircraft type entries with wake turbulence category"
+    task_families: [7]
+    citation: >
+      International Civil Aviation Organization (ICAO).
+      Doc 8643 — Aircraft Type Designators.
+      Available at: https://www.icao.int/publications/doc8643/Pages/default.aspx
+    last_verified: "2026-05-17"
+    notes: >
+      Provides ICAO wake turbulence category (J/H/M/L) per aircraft type.
+      The search/download interface at the URL above requires no registration.
+      Extract as structured YAML/JSON for wake category lookup in Task Family 7.
+    enabled: false
+
+  # ── 15. ICAO Doc 9859 — Safety Management Manual (free) ───────────────────
+  - source_id: "ICAO_DOC9859"
+    name: "ICAO Doc 9859 — Safety Management Manual (4th Edition, free)"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://www.icao.int/safety/SafetyManagement/Pages/GuidanceDocuments.aspx"
+    license: >
+      ICAO Doc 9859 (4th edition) is made freely available by ICAO on their
+      safety management guidance page. No purchase required.
+    commercial_use_ok: "unknown"
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
     user_action_description: null
     expected_format:
       - "pdf"
-    estimated_volume: "One MMEL per aircraft make/model; ~200+ documents"
-    task_families: [8]
+    estimated_volume: "Single document (~300 pages)"
+    task_families: [1, 2]
     citation: >
-      Federal Aviation Administration (FAA).
-      Master Minimum Equipment List (MMEL) Policy Letter and Aircraft-Specific MMELs.
-      Available at: https://rgl.faa.gov/
+      International Civil Aviation Organization (ICAO).
+      Doc 9859 — Safety Management Manual (SMM), 4th Edition.
+      Montreal: ICAO, 2018.
+      Available at: https://www.icao.int/safety/SafetyManagement/Pages/GuidanceDocuments.aspx
     last_verified: "2026-05-17"
     notes: >
-      Select MMELs for common commercial aircraft types (B737, B777, A320, A350).
-      MMEL tables define ATA chapter, item description, categories A/B/C/D,
-      O-items, M-items, and dispatch conditions.
-      Extract structured MEL rules as knowledge points for Task Family 8.
+      Free download. Covers SMS framework, risk matrix, hazard identification.
+      Relevant for Task Families 1 and 2 (ASRS/NTSB KP extraction).
     enabled: false
 
-  # ── 18. ICAO Doc 9981 / Airport Operations Manuals ────────────────────────
-  - source_id: "ICAO_AIRPORT_OPS"
-    name: "ICAO Doc 9981 — PANS-Aerodromes and Airport Operations Guidance"
+  # ── 16. ICAO Doc 9870 — Prevention of Runway Incursions (free) ────────────
+  - source_id: "ICAO_DOC9870"
+    name: "ICAO Doc 9870 — Manual on the Prevention of Runway Incursions"
     organization: "International Civil Aviation Organization"
-    official_url: "https://www.icao.int/safety/pages/PANS-Aerodromes.aspx"
+    official_url: "https://www.icao.int/safety/RunwayIncursion/Pages/ICAO-Manual-Doc9870.aspx"
     license: >
-      ICAO copyright. May require purchase or institutional access.
-    commercial_use_ok: false
-    access_method: "manual_request"
-    requires_user_action: true
-    user_action_description: >
-      ICAO Doc 9981 may require purchase from the ICAO Store (https://store.icao.int/).
-      Check if your institution has licensed access. Alternatively, refer to ICAO Annex 14
-      (Aerodromes) which is similarly licensed.
+      ICAO Doc 9870 is made freely available on the ICAO runway incursion
+      safety page. No purchase required.
+    commercial_use_ok: "unknown"
+    access_method: "direct_download"
+    requires_user_action: false
+    residency_restriction: "none"
+    critical_path: true
+    alternative_source_id: null
+    user_action_description: null
     expected_format:
       - "pdf"
-    estimated_volume: "Single document; select relevant chapters"
+    estimated_volume: "Single document"
     task_families: [5]
     citation: >
       International Civil Aviation Organization (ICAO).
-      Doc 9981 — PANS-Aerodromes, 2nd Edition.
-      Montreal: ICAO, 2020.
+      Doc 9870 — Manual on the Prevention of Runway Incursions.
+      Montreal: ICAO.
+      Available at: https://www.icao.int/safety/RunwayIncursion/Pages/ICAO-Manual-Doc9870.aspx
     last_verified: "2026-05-17"
     notes: >
-      Used for Task Family 5 (airport surface operations) rule extraction.
-      Supplement with FAA AC 150/5300-13A (Airport Design) which is public domain.
+      Defines runway incursion severity categories and contributing factors.
+      Relevant for Task Family 5 (airport surface operations).
     enabled: false
 
-  # ── 19. FAA Airport Design Advisory Circular ──────────────────────────────
-  - source_id: "FAA_AC_AIRPORT_DESIGN"
-    name: "FAA AC 150/5300-13A — Airport Design"
+# ============================================================================
+# OFF-CRITICAL-PATH SOURCES (residency or access restrictions)
+# Retained for completeness; must not be on critical path.
+# ============================================================================
+
+  # ── 17. FAA NOTAM API (off critical path — us_resident restriction) ────────
+  - source_id: "FAA_NOTAM_API"
+    name: "FAA NOTAM API (api.faa.gov)"
     organization: "Federal Aviation Administration"
-    official_url: "https://www.faa.gov/airports/engineering/advisory_circulars/"
+    official_url: "https://api.faa.gov/notamapi/"
     license: >
       Public domain (U.S. Government work, 17 U.S.C. §105).
     commercial_use_ok: true
-    access_method: "direct_download"
-    requires_user_action: false
-    user_action_description: null
+    access_method: "api"
+    requires_user_action: true
+    residency_restriction: "us_resident"
+    critical_path: false
+    alternative_source_id: "FAA_DOCS"
+    user_action_description: >
+      Requires free API key registration at https://api.faa.gov.
+      The API ToS and account system are oriented toward US-based users.
+      Non-US-resident access is not explicitly supported — off critical path.
     expected_format:
-      - "pdf"
-    estimated_volume: "Single AC document (~600 pages)"
-    task_families: [5]
+      - "json"
+    estimated_volume: "Millions of NOTAMs; filter by ICAO code and date range"
+    task_families: [4]
     citation: >
       Federal Aviation Administration (FAA).
-      Advisory Circular AC 150/5300-13A — Airport Design.
-      Available at: https://www.faa.gov/airports/engineering/advisory_circulars/
+      NOTAM API. Available at: https://api.faa.gov/notamapi/
     last_verified: "2026-05-17"
     notes: >
-      Provides taxiway and runway geometry standards, separation criteria,
-      and hot spot definitions useful for Task Family 5.
+      OFF CRITICAL PATH. Replaced by FAA_DOCS (JO 7930.2 NOTAM format reference)
+      for KP extraction and format grounding.
+      For live NOTAM volume in Task Family 4, use ICAO Annex 15 worked examples
+      and publicly archived NOTAM snapshots (academic publications).
+      Re-enable only if team-lead confirms US-resident access is available.
     enabled: false
 
-  # ── 20. FAA SWIM / TFMS Flight Data ───────────────────────────────────────
-  - source_id: "FAA_TFMS"
-    name: "FAA Traffic Flow Management System (TFMS) Data"
-    organization: "Federal Aviation Administration"
-    official_url: "https://tfm.faa.gov/"
+  # ── 18. NOAA Aviation Weather API (off critical path — replaced by IEM) ────
+  - source_id: "NOAA_AWC_API"
+    name: "NOAA Aviation Weather Center Data API (aviationweather.gov)"
+    organization: "NOAA / National Weather Service"
+    official_url: "https://aviationweather.gov/data/api/"
     license: >
-      Some TFMS aggregate data is public. Raw flight-level data requires
-      FAA data sharing agreement.
-    commercial_use_ok: "unknown"
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: false
+    residency_restriction: "us_resident"
+    critical_path: false
+    alternative_source_id: "IEM_METAR"
+    user_action_description: null
+    expected_format:
+      - "json"
+      - "xml"
+      - "text"
+    estimated_volume: "Current + recent METAR/TAF; limited historical archive"
+    task_families: [3]
+    citation: >
+      NOAA Aviation Weather Center (AWC).
+      Data API. Available at: https://aviationweather.gov/data/api/
+    last_verified: "2026-05-17"
+    notes: >
+      OFF CRITICAL PATH. Replaced by IEM_METAR which provides the same
+      underlying NOAA/NWS METAR/TAF data without residency concerns
+      and with a deeper historical archive.
+    enabled: false
+
+  # ── 19. EUROCONTROL DDS / PRISME (off critical path — eu_member) ──────────
+  - source_id: "EUROCONTROL_DDS"
+    name: "EUROCONTROL Data Demand Service (DDS) / Network Statistics"
+    organization: "EUROCONTROL"
+    official_url: "https://www.eurocontrol.int/service/data-demand-service"
+    license: >
+      EUROCONTROL Data Policy; research access under specific agreements.
+    commercial_use_ok: false
     access_method: "manual_request"
     requires_user_action: true
+    residency_restriction: "eu_member"
+    critical_path: false
+    alternative_source_id: "OPENSKY_ADSB"
     user_action_description: >
-      TFMS aggregate reports (ASPM, OPSNET) available at https://aspm.faa.gov/.
-      Raw GDP/EDCT data requires FAA data-sharing agreement.
-      Contact: FAA Air Traffic Organization, System Operations.
+      Raw flight data requires Network Member or research agreement.
+      Contact: https://www.eurocontrol.int/network-manager/research
     expected_format:
       - "csv"
       - "xlsx"
-    estimated_volume: "Aggregate stats freely available; flight-level restricted"
-    task_families: [9]
+    estimated_volume: "Millions of flight records annually"
+    task_families: [6, 9]
     citation: >
-      Federal Aviation Administration (FAA).
-      Traffic Flow Management System (TFMS).
-      Available at: https://tfm.faa.gov/
+      EUROCONTROL Network Manager.
+      EUROCONTROL Data Demand Service.
+      Available at: https://www.eurocontrol.int/our-data
     last_verified: "2026-05-17"
     notes: >
-      Use public OPSNET data (https://aspm.faa.gov/opsnet/sys/main.asp)
-      for airport capacity and delay statistics.
-      For Task Family 9 (GDP scenarios), construct synthetic instances grounded
-      in real airport capacity parameters from ASPM data.
-      Mark GDP scenario instances as SYNTHETIC per CLAUDE.md §2.2.
+      OFF CRITICAL PATH. Replaced by OPENSKY_ADSB for trajectory data.
+      Re-enable only if institutional EU/ECAC membership provides access.
+    enabled: false
+
+  # ── 20. ICAO Purchased Documents (off critical path — commercial_license) ──
+  - source_id: "ICAO_DOCS_PURCHASED"
+    name: "ICAO Annexes and PANS (purchased documents)"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://store.icao.int/"
+    license: >
+      ICAO copyright. Purchase required for most Annexes and PANS.
+    commercial_use_ok: false
+    access_method: "manual_request"
+    requires_user_action: true
+    residency_restriction: "commercial_license"
+    critical_path: false
+    alternative_source_id: "FAA_DOCS"
+    user_action_description: >
+      Most ICAO Annexes (3, 13, 15) and PANS (Doc 4444) require purchase
+      from the ICAO Store (https://store.icao.int/) or institutional library
+      subscription. ICAO Doc 9859 and Doc 9870 are free (see those entries).
+    expected_format:
+      - "pdf"
+    estimated_volume: "Dozens of documents; select by task family"
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8]
+    citation: >
+      International Civil Aviation Organization (ICAO).
+      [Document title, Doc number, edition]. Montreal: ICAO, [year].
+    last_verified: "2026-05-17"
+    notes: >
+      OFF CRITICAL PATH. Key rules from ICAO Annex 3 (meteorology),
+      Annex 15 (NOTAM), Doc 4444 (ATC separation) are summarised in
+      public FAA documents (AIM, JO 7110.65, JO 7930.2) which cover
+      the same procedures for the US system.
+      Re-enable if institutional library access is confirmed.
     enabled: false

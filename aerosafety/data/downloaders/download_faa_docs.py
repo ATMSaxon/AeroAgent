@@ -1,16 +1,16 @@
 """
 Downloader: FAA Regulatory Documents
-  - FAA Advisory Circulars (source_id=FAA_AC)
+  - FAA Published Orders, ACs, AIM (source_id=FAA_DOCS)
+      Covers: Advisory Circulars, JO 7110.65, JO 7930.2, wake turbulence tables
   - Title 14 CFR / eCFR (source_id=FAA_CFR14)
   - FAA Airport Diagrams (source_id=FAA_AIRPORT_DIAGRAMS)
-  - FAA Wake Category Tables / JO 7110.65 (source_id=FAA_WAKE_CATEGORIES)
   - FAA MMEL Documents (source_id=FAA_MMEL)
   - FAA SDR Database (source_id=FAA_SDR)
 
 DO NOT EXECUTE without team-lead approval (task brief hard rule 1).
 
 All sources are public domain (U.S. Government work, 17 U.S.C. §105).
-No API key required.
+No API key, no registration, no residency restriction.
 
 Rate limits:
   FAA websites do not publish formal rate limits.
@@ -31,8 +31,10 @@ RATE_LIMIT_SECONDS = 1.5
 
 # ── Advisory Circulars ──────────────────────────────────────────────────────
 
-AC_SOURCE_ID = "FAA_AC"
-AC_OUTPUT_DIR = RAW_DATA_DIR / AC_SOURCE_ID
+# FAA_DOCS covers all FAA published orders, ACs, and AIM.
+# Advisory Circulars and JO orders are all under this single source_id.
+AC_SOURCE_ID = "FAA_DOCS"
+AC_OUTPUT_DIR = RAW_DATA_DIR / AC_SOURCE_ID / "advisory_circulars"
 
 # Priority ACs mapped to task families and download URLs.
 # URL pattern: https://www.faa.gov/documentLibrary/media/{DocNum}.pdf
@@ -128,8 +130,8 @@ def download_airport_diagrams(cycle: str, *, dry_run: bool = True) -> None:
 
 # ── FAA JO 7110.65 Wake Turbulence Chapter ────────────────────────────────
 
-WAKE_SOURCE_ID = "FAA_WAKE_CATEGORIES"
-WAKE_OUTPUT_DIR = RAW_DATA_DIR / WAKE_SOURCE_ID
+WAKE_SOURCE_ID = "FAA_DOCS"
+WAKE_OUTPUT_DIR = RAW_DATA_DIR / WAKE_SOURCE_ID / "wake_categories"
 
 # ATC order JO 7110.65 HTML chapters.
 # Wake turbulence separation is in Chapter 5 (Radar) and Chapter 3 (Terminal).
@@ -212,6 +214,75 @@ def download_sdr_database(*, dry_run: bool = True) -> None:
         )
 
 
+# ── ICAO Doc 8643 — Aircraft Type Designators (wake category lookup) ──────
+
+ICAO8643_SOURCE_ID = "ICAO_DOC8643"
+ICAO8643_OUTPUT_DIR = RAW_DATA_DIR / ICAO8643_SOURCE_ID
+
+# ICAO Doc 8643 provides a searchable HTML/CSV interface at:
+# https://www.icao.int/publications/doc8643/Pages/default.aspx
+# The CSV export of aircraft type designators (including wake category) is
+# accessible without registration.
+ICAO8643_CSV_URL = (
+    "https://www.icao.int/publications/doc8643/Pages/doc8643.aspx"
+)
+
+
+def download_icao_doc8643(*, dry_run: bool = True) -> None:
+    """
+    Download ICAO Doc 8643 aircraft type designator data.
+
+    This provides the authoritative ICAO wake turbulence category (J/H/M/L)
+    per aircraft type for Task Family 7.
+    """
+    dest = ICAO8643_OUTPUT_DIR / "doc8643_aircraft_types.csv"
+    if dry_run:
+        logger.info(
+            "DRY RUN — ICAO8643 source_id=%s url=%s -> %s",
+            ICAO8643_SOURCE_ID, ICAO8643_CSV_URL, dest,
+        )
+        return
+    if not dry_run:
+        raise RuntimeError(
+            "dry_run=False requires team-lead approval. See task brief hard rule 1."
+        )
+
+
+# ── ICAO Free Documents (Doc 9859, Doc 9870) ──────────────────────────────
+
+ICAO_FREE_SOURCE_IDS = {
+    "ICAO_DOC9859": (
+        "ICAO_DOC9859",
+        # URL sourced from ICAO safety management guidance page (public).
+        "https://www.icao.int/safety/SafetyManagement/Documents/"
+        "Doc.9859.3rd%20Edition.alltext.en.pdf",
+        "ICAO_Doc9859_Safety_Management_Manual.pdf",
+    ),
+    "ICAO_DOC9870": (
+        "ICAO_DOC9870",
+        "https://www.icao.int/safety/RunwayIncursion/Documents/"
+        "Doc%209870%20EN.pdf",
+        "ICAO_Doc9870_Runway_Incursion_Prevention.pdf",
+    ),
+}
+
+
+def download_icao_free_docs(*, dry_run: bool = True) -> None:
+    """Download ICAO documents that are freely available without purchase."""
+    for source_id, url, filename in ICAO_FREE_SOURCE_IDS.values():
+        dest = RAW_DATA_DIR / source_id / filename
+        if dry_run:
+            logger.info(
+                "DRY RUN — ICAO free doc source_id=%s url=%s -> %s",
+                source_id, url, dest,
+            )
+            continue
+        if not dry_run:
+            raise RuntimeError(
+                "dry_run=False requires team-lead approval. See task brief hard rule 1."
+            )
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     download_advisory_circulars(dry_run=True)
@@ -220,4 +291,6 @@ if __name__ == "__main__":
     download_wake_category_tables(dry_run=True)
     download_mmel_documents(dry_run=True)
     download_sdr_database(dry_run=True)
+    download_icao_doc8643(dry_run=True)
+    download_icao_free_docs(dry_run=True)
     logger.info("All dry runs complete. Awaiting team-lead approval.")

@@ -1,159 +1,108 @@
 """
-Downloader: FAA NOTAM API (source_id=FAA_NOTAM)
+Downloader: FAA NOTAM Reference Documents (source_id=FAA_DOCS, NOTAM subset)
 
 DO NOT EXECUTE without team-lead approval (task brief hard rule 1).
 
-Requires: FAA API key from https://api.faa.gov (free registration).
-Set environment variable FAA_NOTAM_API_KEY before running.
+What this script downloads:
+  1. FAA JO 7930.2 — NOTAM System Order (NOTAM format definitions and examples).
+  2. FAA AIM Chapter 5 Section 1 (NOTAM operational procedures).
+  3. FAA JO 7110.65 (ATC order — NOTAM handling in ATC context).
+  4. FAA AC 91-70B (contains NOTAM worked examples for oceanic operations).
 
-Rate limits:
-  FAA API: https://api.faa.gov/terms-and-conditions
-  Default: 100 requests/minute per API key.
-  -> Use 0.7-second inter-request delay.
+These are the primary sources for Task Family 4 (NOTAM compliance) KP extraction.
+Real NOTAM volume for scenario construction uses publicly archived NOTAM
+snapshots from academic papers and ADS-B Exchange, not a gated API.
+
+DESIGN NOTE: The FAA NOTAM API (api.faa.gov) was removed from the critical
+path because it requires registration with US-resident orientation.
+See source_registry.yaml FAA_NOTAM_API (off critical path,
+residency_restriction=us_resident). This script replaces it with equivalent
+public PDF/HTML documents that contain NOTAM format specifications and examples.
+
+Rate limits: FAA website — no published limit; use 1.5-second inter-request delay.
 
 License: Public domain (U.S. Government work, 17 U.S.C. §105).
 Commercial use: OK.
-Citation:
-  Federal Aviation Administration (FAA).
-  NOTAM Management System / NOTAM Search.
-  API: https://api.faa.gov/notamapi/
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
-from aerosafety.data.downloaders._base import (
-    RAW_DATA_DIR,
-    fetch_json_api,
-    _write_manifest_entry,
-)
+from aerosafety.data.downloaders._base import RAW_DATA_DIR, fetch_url
 
 logger = logging.getLogger(__name__)
 
-SOURCE_ID = "FAA_NOTAM"
-OUTPUT_DIR = RAW_DATA_DIR / SOURCE_ID
-RATE_LIMIT_SECONDS = 0.7  # ~85 req/min, below 100 limit
+SOURCE_ID = "FAA_DOCS"
+OUTPUT_DIR = RAW_DATA_DIR / SOURCE_ID / "notam_reference"
+RATE_LIMIT_SECONDS = 1.5
 
-# FAA NOTAM API base URL.
-# Ref: https://api.faa.gov/notamapi/
-FAA_NOTAM_API_BASE = "https://api.faa.gov/notamapi/v1/notams"
+# FAA JO 7930.2 — NOTAM System Order.
+# Defines: NOTAM format, Q-code structure, effective time encoding,
+# schedule groups, keyword taxonomy, annotated examples.
+JO_7930_2_URL = (
+    "https://www.faa.gov/documentLibrary/media/Order/JO_7930.2R.pdf"
+)
 
-# Priority airports for Task Family 4 (NOTAM compliance).
-PRIORITY_AIRPORTS = [
-    "KLAX", "KJFK", "KORD", "KATL", "KDFW",
-    "KSFO", "KMIA", "KDEN", "KBOS", "KSEA",
-    "KIAD", "KPHX", "KEWR", "KDTW", "KLAS",
+# FAA JO 7110.65 (ATC Order) — full order including NOTAM handling in ATC.
+JO_7110_65_URL = (
+    "https://www.faa.gov/documentLibrary/media/Order/"
+    "7110.65Z_Basic_dtd_4-3-14.pdf"
+)
+
+# FAA AC 91-70B — contains NOTAM worked examples for oceanic/remote operations.
+AC_91_70B_URL = (
+    "https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_91-70B.pdf"
+)
+
+# AIM Chapter 5 Section 1 HTML — NOTAM operational procedures for pilots/dispatchers.
+AIM_NOTAM_SECTION_URL = (
+    "https://www.faa.gov/air_traffic/publications/atpubs/aim_html/"
+    "chap5_section_1.html"
+)
+
+NOTAM_REFERENCE_DOCS: list[tuple[str, str]] = [
+    ("JO_7930.2_NOTAM_System.pdf", JO_7930_2_URL),
+    ("JO_7110.65_ATC_Order.pdf", JO_7110_65_URL),
+    ("AC_91-70B_Oceanic_Operations.pdf", AC_91_70B_URL),
+    ("AIM_Chapter5_Section1_NOTAMs.html", AIM_NOTAM_SECTION_URL),
 ]
 
 
-def _get_api_key() -> str:
-    key = os.environ.get("FAA_NOTAM_API_KEY")
-    if not key:
-        raise EnvironmentError(
-            "FAA_NOTAM_API_KEY environment variable is not set. "
-            "Register at https://api.faa.gov to obtain a free API key. "
-            "This is a requires_user_action source."
-        )
-    return key
-
-
-def download_notams_for_airport(
-    icao: str,
-    *,
-    page_size: int = 100,
-    max_pages: int = 10,
-    dry_run: bool = True,
-) -> None:
+def download_notam_reference_docs(*, dry_run: bool = True) -> None:
     """
-    Download NOTAMs for a single airport from the FAA NOTAM API.
+    Download FAA NOTAM format reference documents.
 
-    Pages through results up to max_pages * page_size records.
+    No API key or registration required. All public domain.
 
     Args:
-        icao:       ICAO airport identifier (e.g., 'KLAX').
-        page_size:  Records per API page (max 100).
-        max_pages:  Maximum pages to fetch per airport.
-        dry_run:    If True, only log.
+        dry_run: If True (default), only log what would be fetched.
     """
     if not dry_run:
         raise RuntimeError(
             "dry_run=False requires team-lead approval. See task brief hard rule 1."
         )
 
-    api_key = _get_api_key() if not dry_run else "DRY_RUN_KEY"
-
-    for page_num in range(1, max_pages + 1):
-        params = {
-            "icaoLocation": icao,
-            "pageSize": page_size,
-            "pageNum": page_num,
-        }
-        headers = {"client_id": api_key}
-
+    for filename, url in NOTAM_REFERENCE_DOCS:
+        dest = OUTPUT_DIR / filename
         if dry_run:
             logger.info(
-                "DRY RUN — NOTAM source_id=%s airport=%s page=%d url=%s params=%s",
-                SOURCE_ID, icao, page_num, FAA_NOTAM_API_BASE, params,
+                "DRY RUN — NOTAM ref source_id=%s url=%s -> %s",
+                SOURCE_ID, url, dest,
             )
-            break  # One log line per airport in dry run.
+            continue
 
-        body = fetch_json_api(
-            SOURCE_ID,
-            FAA_NOTAM_API_BASE,
-            params,
-            headers=headers,
-            rate_limit_seconds=RATE_LIMIT_SECONDS,
-        )
-
-        items = body.get("items", [])
-        if not items:
-            logger.info(
-                "No more NOTAMs for %s at page %d. Stopping.", icao, page_num
-            )
-            break
-
-        dest = OUTPUT_DIR / icao / f"page_{page_num:04d}.json"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with open(dest, "w", encoding="utf-8") as f:
-            json.dump(body, f, indent=2)
-
-        # Write manifest entry for the API response.
-        _write_manifest_entry({
-            "source_id": SOURCE_ID,
-            "url_fetched": FAA_NOTAM_API_BASE,
-            "access_timestamp": datetime.now(timezone.utc).isoformat(),
-            "local_file_path": str(dest),
-            "sha256": "",  # Not applicable for API JSON responses directly.
-            "http_status_code": 200,
-            "content_length_bytes": len(json.dumps(body).encode()),
-            "error": None,
-            "query_params": params,
-        })
-        logger.info("Saved NOTAMs for %s page %d to %s", icao, page_num, dest)
-
-        total_count = body.get("totalCount", 0)
-        fetched_so_far = page_num * page_size
-        if fetched_so_far >= total_count:
-            logger.info("All %d NOTAMs fetched for %s.", total_count, icao)
-            break
-
-
-def download_all_priority_airports(*, dry_run: bool = True) -> None:
-    """Download NOTAMs for all priority airports."""
-    for icao in PRIORITY_AIRPORTS:
-        download_notams_for_airport(icao, dry_run=dry_run)
+        fetch_url(SOURCE_ID, url, dest, rate_limit_seconds=RATE_LIMIT_SECONDS)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    download_all_priority_airports(dry_run=True)
+    download_notam_reference_docs(dry_run=True)
     logger.info(
-        "Dry run complete. Set FAA_NOTAM_API_KEY and get team-lead approval "
-        "before executing with dry_run=False."
+        "Dry run complete. Awaiting team-lead approval.\n"
+        "REMINDER: FAA NOTAM API (api.faa.gov) is off critical path "
+        "(residency_restriction=us_resident). NOTAM KPs extracted from "
+        "JO 7930.2 and AIM instead."
     )
