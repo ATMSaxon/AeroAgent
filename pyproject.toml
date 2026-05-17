@@ -46,6 +46,12 @@ dev = [
 ]
 gpu = [
     "torch>=2.3",
+    "transformers>=4.40",
+    "peft>=0.11",
+    "trl>=0.9",
+    "datasets>=2.19",
+    "accelerate>=0.30",
+    "sentence-transformers>=3.0",
     "faiss-gpu>=1.8",
 ]
 
