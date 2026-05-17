@@ -13,7 +13,8 @@ Validates:
 - Required fields present and non-empty
 - Failure mode labels are known values
 - Type B real-data cards cite manifest-verified NTSB report IDs
-- Type D cards cite one of the five authorized report IDs
+- Type D cards cite one of the authorized report IDs (22 real NTSB reports)
+- B+D combined pool has >=60% real citation rate (T22 constraint)
 """
 
 from __future__ import annotations
@@ -42,22 +43,47 @@ TASK_FILES = {
     "D": TASKS_DIR / "typeD_agentic.jsonl",
 }
 
-# The five authorized NTSB report IDs for Type D narrative excerpts
+# Authorized NTSB report IDs for Type D narrative excerpts (22 real reports from PDFs)
 AUTHORIZED_REPORT_IDS = {
+    # T20 original 5 reports
     "ERA23LA177",
     "WPR25FA062",
     "ANC25FA010",
     "ERA25FA082",
     "ERA25FA080",
+    # T22 new 17 reports from NTSB_FULL_REPORTS PDFs
+    "ANC24LA006",
+    "WPR24FA035",
+    "CEN24LA037",
+    "WPR24LA051",
+    "ANC24LA005",
+    "WPR23LA362",
+    "ERA24FA053",
+    "CEN24LA051",
+    "ERA24LA051",
+    "WPR24LA042",
+    "ERA24LA047",
+    "ERA24LA046",
+    "ERA24LA044",
+    "CEN24LA041",
+    "ERA24LA040",
+    "WPR24LA036",
+    "ERA24LA033",
 }
 
-# All valid NTSB report IDs present in the CAROL CSV extract used for Type B
+# All valid NTSB report IDs present in the CAROL JSON extract used for Type B
+# Original 20 (T20) + 20 new (T22) = 40 total
 MANIFEST_NTSB_IDS = {
+    # T20 original 20
     "ERA26LA207", "WPR26LA180", "ANC26FA039", "CEN26FA172", "ERA26FA179",
     "WPR26FA160", "CEN26FA174", "ERA26LA196", "WPR26LA176", "CEN26LA180",
     "ANC26LA040", "WPR26LA164", "DCA26LA203", "ERA26LA190", "WPR26LA183",
     "CEN26LA173", "ERA26LA184", "ANC26LA037", "ERA26LA199", "DCA26WA202",
-    "ERA26LA207",
+    # T22 new 20 from CAROL JSON
+    "WPR26LA174", "DCA26FA194", "CEN26LA168", "ERA26FA177", "WPR26FA141",
+    "DCA26MA161", "CEN26LA156", "DCA26LA185", "CEN26FA140", "ERA26LA197",
+    "WPR26FA120", "ERA26FA165", "CEN26LA148", "CEN26LA164", "WPR26LA155",
+    "ERA26LA140", "ERA26LA144", "ERA26LA158", "WPR26LA126", "ANC26LA038",
 }
 
 
@@ -288,15 +314,15 @@ def test_type_counts_within_spec():
     cards = _load_all_cards()
     counts = {t: sum(1 for c in cards if c.task_type == t) for t in "ABCD"}
     assert 25 <= counts["A"] <= 40, f"Type A count {counts['A']} outside [25,40]"
-    assert 18 <= counts["B"] <= 25, f"Type B count {counts['B']} outside [18,25]"
-    assert 10 <= counts["C"] <= 16, f"Type C count {counts['C']} outside [10,16]"
-    assert 8 <= counts["D"] <= 16, f"Type D count {counts['D']} outside [8,16]"
+    assert 35 <= counts["B"] <= 45, f"Type B count {counts['B']} outside [35,45]"
+    assert 18 <= counts["C"] <= 25, f"Type C count {counts['C']} outside [18,25]"
+    assert 22 <= counts["D"] <= 30, f"Type D count {counts['D']} outside [22,30]"
 
 
 def test_total_card_count():
     cards = _load_all_cards()
-    assert 70 <= len(cards) <= 95, (
-        f"Total card count {len(cards)} outside expected range [70, 95]"
+    assert 110 <= len(cards) <= 135, (
+        f"Total card count {len(cards)} outside expected range [110, 135]"
     )
 
 
@@ -311,3 +337,27 @@ def test_no_real_synthetic_mix_on_single_card():
                 assert rpt_id not in card.provenance.source or card.provenance.source == "SYNTHETIC", (
                     f"Card {card.task_id} claims SYNTHETIC but source contains {rpt_id}"
                 )
+
+
+def test_bd_pool_real_citation_rate():
+    """B+D combined pool must have >=60% real citation rate (T22 hard constraint)."""
+    cards = _load_all_cards()
+    bd_cards = [c for c in cards if c.task_type in ("B", "D")]
+    assert len(bd_cards) > 0, "No B or D cards found"
+    real_bd = [c for c in bd_cards if c.provenance.generation_rule is None]
+    rate = len(real_bd) / len(bd_cards)
+    assert rate >= 0.60, (
+        f"B+D real citation rate {rate:.1%} ({len(real_bd)}/{len(bd_cards)}) "
+        f"below required 60%"
+    )
+
+
+def test_type_b_all_real():
+    """All Type B cards must be real NTSB CAROL data per T22 spec."""
+    cards = _load_all_cards()
+    type_b = [c for c in cards if c.task_type == "B"]
+    for card in type_b:
+        assert card.provenance.generation_rule is None, (
+            f"Type B card {card.task_id} should be real NTSB data (no generation_rule) "
+            f"per T22 spec"
+        )
