@@ -29,6 +29,8 @@ data/eval/eval_set.jsonl
 data/eval/dev_set.jsonl
 *.jsonl
 !tests/fixtures/*.jsonl
+# Task cards are versioned ground truth — must be tracked
+!aerosafety/tasks/**/*.jsonl
 
 # Model checkpoints
 checkpoints/
