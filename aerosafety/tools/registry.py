@@ -345,6 +345,84 @@ _TOOLS: list[ToolDescriptor] = [
         mock=True,
     ),
     ToolDescriptor(
+        name="optimization_solver",
+        description=(
+            "*** PARTIAL IMPLEMENTATION — requires 'ortools' or 'pulp' installed *** "
+            "Solve small aviation optimization instances with safety constraints. "
+            "Supports: solve_runway_sequence (wake-constrained sequencing MIP/CP-SAT), "
+            "solve_gate_assignment (size+buffer ILP), solve_ground_delay_allocation (GDP LP). "
+            "Raises ImportError if neither ortools nor pulp is installed — "
+            "agent MUST handle this and route to human escalation (CLAUDE.md §8.1). "
+            "Returns feasible=False with infeasibility_reason if problem is infeasible — "
+            "NEVER fabricates a feasible solution. "
+            "Safety constraints (wake separation, gate buffers, capacity caps) are "
+            "hard constraints; post-solve violated_constraints list is always checked."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "problem_type": {
+                    "type": "string",
+                    "enum": [
+                        "solve_runway_sequence",
+                        "solve_gate_assignment",
+                        "solve_ground_delay_allocation",
+                    ],
+                    "description": "Which optimization problem to solve",
+                },
+                "instance": {
+                    "type": "object",
+                    "description": (
+                        "Problem instance. For solve_runway_sequence: "
+                        "{aircraft: [{id, type_icao, wake_category, earliest_time, latest_time, scheduled_time}], "
+                        "wake_sep_matrix: {\"(leader_wake,follower_wake)\": min_sep_seconds}, "
+                        "runway_capacity_per_hour: int}. "
+                        "For solve_gate_assignment: "
+                        "{flights: [{id, arrival, departure, aircraft_size, airline, preferred_terminal}], "
+                        "gates: [{id, terminal, compatible_sizes, buffer_minutes}]}. "
+                        "For solve_ground_delay_allocation: "
+                        "{flights: [{id, scheduled_departure, cost_per_delay_unit, max_delay, destination_airport}], "
+                        "airport_capacity_slots: [[start, end, max_arrivals], ...]}"
+                    ),
+                },
+            },
+            "required": ["problem_type", "instance"],
+        },
+        returns={
+            "type": "object",
+            "description": "Solver result with feasibility flag and safety constraint status",
+            "properties": {
+                "feasible": {"type": "boolean"},
+                "safety_constraints_satisfied": {"type": "boolean"},
+                "violated_constraints": {"type": "array", "items": {"type": "string"}},
+                "objective_value": {"type": "number"},
+                "solver_used": {"type": "string"},
+                "infeasibility_reason": {"type": ["string", "null"]},
+                "sequence": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "For runway sequencing: ordered aircraft ids",
+                },
+                "assignment": {
+                    "type": "object",
+                    "description": "For gate assignment: {flight_id: gate_id}",
+                },
+                "delays": {
+                    "type": "object",
+                    "description": "For GDP: {flight_id: delay_seconds}",
+                },
+            },
+        },
+        standard=(
+            "ICAO Doc 4444 PANS-ATM, 16th ed. 2016 Table 8-1 (wake separation minima) — "
+            "https://www.icao.int/safety/airnavigation/Pages/pans-atm.aspx; "
+            "FAA Order JO 7110.65Z §5-5-4 (wake turbulence separation) — "
+            "https://www.faa.gov/air_traffic/publications/atpubs/atc_html/; "
+            "FAA Order JO 7210.3 (ATCSCC GDP procedures) — "
+            "https://www.faa.gov/regulations_policies/orders_notices"
+        ),
+        mock=True,
+    ),
+    ToolDescriptor(
         name="check_weather_minima",
         description=(
             "Check whether observed METAR conditions meet ILS approach minima "
