@@ -100,9 +100,9 @@ def test_all_cards_parse(all_cards: list[TaskCard]) -> None:
 
 def test_total_card_count(all_cards: list[TaskCard]) -> None:
     n = len(all_cards)
-    # Per task brief: ~60-70 cards total across A/B/C/D
-    assert 55 <= n <= 80, (
-        f"Expected 55-80 task cards total (per T19 brief: ~60-70), got {n}"
+    # Scaled to 250+ cards (OPT2-* expansion); original brief was ~60-70
+    assert 250 <= n, (
+        f"Expected >=250 task cards total (OPT2 scale target), got {n}"
     )
 
 
@@ -122,10 +122,11 @@ def test_task_ids_unique(all_cards: list[TaskCard]) -> None:
 
 def test_task_id_format(all_cards: list[TaskCard]) -> None:
     import re
-    pattern = re.compile(r"^OD-[ABCD]-\d{3}$")
+    # Original OD-* cards + OPT2-* scaled cards
+    pattern = re.compile(r"^(OD|OPT2)-[ABCD]-\d{3}$")
     for card in all_cards:
         assert pattern.match(card.task_id), (
-            f"task_id {card.task_id!r} does not match expected format OD-<TYPE>-<NNN>"
+            f"task_id {card.task_id!r} does not match expected format OD-<TYPE>-<NNN> or OPT2-<TYPE>-<NNN>"
         )
 
 
@@ -139,19 +140,18 @@ def test_type_counts_within_spec(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
         by_type[card.task_type] = by_type.get(card.task_type, 0) + 1
 
-    # Per T19 brief:
-    # Type A: 20-30, Type B: 15-20, Type C: 10-12, Type D: 10-15
-    assert 18 <= by_type.get("A", 0) <= 35, (
-        f"Type A count {by_type.get('A',0)} outside 18-35"
+    # OPT2 scale targets: A ~35, B ~117, C ~60, D ~38
+    assert 30 <= by_type.get("A", 0), (
+        f"Type A count {by_type.get('A',0)} below 30 (OPT2 scale target)"
     )
-    assert 13 <= by_type.get("B", 0) <= 22, (
-        f"Type B count {by_type.get('B',0)} outside 13-22"
+    assert 100 <= by_type.get("B", 0), (
+        f"Type B count {by_type.get('B',0)} below 100 (OPT2 scale target)"
     )
-    assert 8 <= by_type.get("C", 0) <= 15, (
-        f"Type C count {by_type.get('C',0)} outside 8-15"
+    assert 50 <= by_type.get("C", 0), (
+        f"Type C count {by_type.get('C',0)} below 50 (OPT2 scale target)"
     )
-    assert 8 <= by_type.get("D", 0) <= 18, (
-        f"Type D count {by_type.get('D',0)} outside 8-18"
+    assert 30 <= by_type.get("D", 0), (
+        f"Type D count {by_type.get('D',0)} below 30 (OPT2 scale target)"
     )
 
 
@@ -409,6 +409,47 @@ def test_wake_separation_evidence_in_sequencing_cards(all_cards: list[TaskCard])
         assert has_icao, (
             f"task_id={card.task_id}: wake/separation card should cite ICAO Doc 4444 "
             f"or FAA AC 90-23G in evidence_requirements"
+        )
+
+
+# ---------------------------------------------------------------------------
+# OPT2 scale coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_csp_instance_diversity(all_cards: list[TaskCard]) -> None:
+    """Every OR-Library CSP instance file (csp{N}.txt) must be cited in at least one B or D card."""
+    CSP_FILES = [
+        "csp1.txt", "csp2.txt", "csp3.txt", "csp4.txt", "csp6.txt",
+        "csp7.txt", "csp8.txt", "csp9.txt", "csp11.txt", "csp12.txt",
+        "csp13.txt", "csp14.txt", "csp16.txt", "csp17.txt", "csp18.txt",
+        "csp19.txt", "csp21.txt", "csp22.txt", "csp23.txt", "csp24.txt",
+    ]
+    bd_cards = [c for c in all_cards if c.task_type in ("B", "D")]
+    for csp_file in CSP_FILES:
+        cited = any(csp_file in (c.provenance.source or "") for c in bd_cards)
+        assert cited, (
+            f"OR-Library instance {csp_file} is not cited in any B or D card. "
+            f"Every CSP instance must be covered (hard rule from OPT2 task brief)."
+        )
+
+
+def test_bts_month_diversity(all_cards: list[TaskCard]) -> None:
+    """Every downloaded BTS ZIP must be cited in at least one C card."""
+    BTS_ZIPS = [
+        "BTS_OnTime_2024_07.zip",
+        "BTS_OnTime_2024_08.zip",
+        "BTS_OnTime_2024_09.zip",
+        "BTS_OnTime_2024_10.zip",
+        "BTS_OnTime_2024_11.zip",
+        "BTS_OnTime_2024_12.zip",
+    ]
+    c_cards = [c for c in all_cards if c.task_type == "C"]
+    for zip_name in BTS_ZIPS:
+        cited = any(zip_name in (c.provenance.source or "") for c in c_cards)
+        assert cited, (
+            f"BTS ZIP {zip_name} is not cited in any C card. "
+            f"Every BTS month file must be covered (hard rule from OPT2 task brief)."
         )
 
 
