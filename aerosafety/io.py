@@ -7,6 +7,8 @@ from this module — do not duplicate or shadow these types elsewhere.
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -135,6 +137,33 @@ class TaskProvenance(BaseModel):
     license: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# Multimodal
+# ---------------------------------------------------------------------------
+
+AttachmentKind = Literal["image", "pdf_region", "trajectory_plot", "lidar_plot"]
+
+
+class MultimodalAttachment(BaseModel):
+    """
+    A single multimodal asset attached to a TaskCard.
+
+    Per CLAUDE.md §2.2: all attachments must carry provenance; synthetic
+    assets must be labeled as such in provenance.source == "SYNTHETIC".
+    sha256 is the hex digest of the file at file_path and is verified
+    by validate_attachments() — NOT during model construction (avoids I/O).
+    """
+
+    attachment_id: str
+    kind: AttachmentKind
+    # Path relative to the base_dir passed to validate_attachments()
+    file_path: str
+    description: str
+    provenance: TaskProvenance
+    # SHA-256 hex digest of the file contents; verified out-of-band
+    sha256: str
+
+
 class TaskCard(BaseModel):
     """
     Canonical unit of evaluation in AeroSafetyEval.
@@ -170,3 +199,37 @@ class TaskCard(BaseModel):
 
     # Optional split tag
     split: Literal["dev", "test"] | None = None
+
+    # Multimodal attachments — empty list for text-only tasks (backward compat)
+    attachments: list[MultimodalAttachment] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# validate_attachments — out-of-band I/O check (CLAUDE.md §8.1)
+# ---------------------------------------------------------------------------
+
+def validate_attachments(card: TaskCard, base_dir: Path) -> None:
+    """
+    Verify that every attachment in card.attachments exists on disk and that
+    its sha256 matches the stored digest.
+
+    NOT called during Pydantic model validation — I/O must stay out of the
+    deserialization path (CLAUDE.md §8.1: no silent failure, but also no
+    hidden side-effects during schema construction).
+
+    Raises:
+        FileNotFoundError: if an attachment file is absent.
+        ValueError: if the sha256 digest does not match.
+    """
+    for att in card.attachments:
+        full_path = base_dir / att.file_path
+        if not full_path.exists():
+            raise FileNotFoundError(
+                f"Attachment '{att.attachment_id}' file not found: {full_path}"
+            )
+        digest = hashlib.sha256(full_path.read_bytes()).hexdigest()
+        if digest != att.sha256:
+            raise ValueError(
+                f"Attachment '{att.attachment_id}' sha256 mismatch: "
+                f"expected {att.sha256!r}, got {digest!r} for {full_path}"
+            )

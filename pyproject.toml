@@ -44,6 +44,10 @@ dev = [
     "mypy>=1.10",
     "types-pyyaml",
 ]
+multimodal = [
+    "pdf2image>=1.17",
+    "Pillow>=10.0",
+]
 gpu = [
     "torch>=2.3",
     "transformers>=4.40",

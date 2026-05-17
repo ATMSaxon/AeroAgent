@@ -126,3 +126,113 @@ Per CLAUDE.md §2.2 and the project's anti-fabrication rules:
   TAF accuracy is not evaluated here; the cards use the TAF as issued.
 - Human expert review is required before any card from this expansion enters
   the frozen test split. See `docs/expert_review_protocol.md`.
+
+---
+
+# T30 Round-3 Scale-Up (WD3 cards)
+
+**Status:** PILOT — NOT EXPERT-REVIEWED
+**Author:** weather-scaler agent, 2026-05-17
+**Covers:** WD3-B-001 through WD3-B-160 (real IEM METAR),
+           WD3-C-001 through WD3-C-100 (real IEM METAR),
+           WD3-D-001 through WD3-D-140 (real IEM METAR + TAF)
+
+---
+
+## T30.1 Data Scope
+
+METAR and TAF data for 20 stations × 12 months (May 2025 – April 2026) were
+sampled from the pre-fetched IEM ASOS corpus at
+`data/raw/IEM_METAR/2026-05-17/` (238 CSVs) and
+`data/raw/IEM_TAF/2026-05-17/` (240 CSVs).
+
+All files are manifest-verified in:
+- `data/raw/IEM_METAR/2026-05-17/manifest.jsonl`
+- `data/raw/IEM_TAF/2026-05-17/manifest.jsonl`
+
+Stations: KASE, KATL, KBOS, KCVG, KDEN, KDFW, KFAR, KGTF, KJFK, KLAX,
+          KMEM, KMIA, KMSY, KONT, KORD, KPHX, KSDF, KSFO, PANC, PAOM.
+
+---
+
+## T30.2 Sampling Algorithm
+
+The sampler (`scripts/generate_wd3_cards.py`, seed=42) operates as follows:
+
+1. **Event detection** — for each METAR row, classify into event categories:
+   - `low_ceiling`: BKN or OVC ceiling < 1000 ft AGL
+   - `gust`: reported gust ≥ 25 kt
+   - `ifr`: ceiling < 1000 ft OR visibility < 3 SM
+   - `ts`: `TS` present in wxcodes column
+   - `fz`: `FZ` present in wxcodes column (FZRA, FZDZ, FZFG, etc.)
+
+2. **Per station-month budget** — at most 25 cards are drawn from any
+   (station, month) pair across TypeB + TypeC + TypeD combined.
+
+3. **Priority ordering** — rarer event types (ts, fz) are sampled first
+   to maximize hazard diversity; high-frequency events (ifr, gust) fill
+   remaining budget.
+
+4. **Card construction** — each card uses the raw `metar` column value
+   verbatim in the prompt. Derived values (crosswind, ceiling, visibility)
+   are computed from the CSV row's numeric columns using the same logic
+   as `aerosafety/tools/wind_component.py` and `weather_minima_checker.py`.
+
+5. **TAF linking** (TypeD only) — the TAF CSV for the same station and
+   month is loaded; the first 3 forecast (FM/TEMPO/BECMG) rows are used
+   to construct the TAF excerpt in the prompt.
+
+---
+
+## T30.3 Event Coverage
+
+| Event type  | METAR rows available | Used in cards |
+|-------------|---------------------|---------------|
+| ts          | ~1150               | ~100          |
+| fz          | ~469                | ~60           |
+| low_ceiling | ~6854               | ~90           |
+| gust ≥25 kt | ~8700               | ~90           |
+| ifr         | ~4689               | ~60           |
+
+---
+
+## T30.4 Provenance Format
+
+Same as §3 above. Examples:
+
+```
+"IEM_METAR KORD 2026-01-15T03:51Z | file: data/raw/IEM_METAR/2026-05-17/KORD_METAR_202601.csv"
+
+"IEM_METAR PANC 2026-01-07T14:53Z | file: data/raw/IEM_METAR/2026-05-17/PANC_METAR_202601.csv | TAF file: data/raw/IEM_TAF/2026-05-17/PANC_TAF_202601.csv"
+```
+
+---
+
+## T30.5 Integrity Guarantees
+
+All guarantees from §4 apply. Additional T30 constraints:
+
+- No (station, month) pair contributes more than 25 cards (enforced by
+  `test_no_station_month_dominates` in `tests/tasks/test_weather_dispatch.py`).
+- Every card's cited CSV path is verified against the manifest
+  (`test_real_data_cards_reference_manifest_csv`).
+- The existing test split cards (WD-B-029–040, WD-C-020–030, WD-D-029–040)
+  are not modified. New WD3-* cards are appended only.
+- One pre-existing provenance error in WD-C-011 was corrected in this round:
+  `KDEN_METAR_202605.csv` → `KDEN_METAR_202505.csv` (May 2025 observation).
+
+---
+
+## T30.6 Limitations
+
+- TypeB/C/D cards are programmatically constructed, not human-authored.
+  Gold decisions and safety constraints are formula-derived from METAR
+  numeric columns and apply generic FAA AIM/14 CFR references.
+  Station-specific IAP minima, NOTAMs, and local procedures are NOT captured.
+- Expert review is required before WD3-* cards enter the frozen test split.
+- KASE (Aspen) has a reduced crosswind limit (15 kt) vs the standard 25 kt
+  used for other stations; this is captured in `STATION_META` in the sampler.
+- PAOM (Nome) is a non-Part-121 airport; Part 135/91 framing is used for those cards.
+- The TAF excerpt used in TypeD cards is the first 3 forecast rows from the
+  same station-month CSV, which may not correspond temporally to the METAR
+  observation. Evaluators should not assume the TAF is contemporaneous.
