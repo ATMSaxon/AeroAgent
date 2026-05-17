@@ -16,12 +16,11 @@ collected in `remarks` verbatim.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 # pydantic import — infra-architect must install pydantic>=2.0
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator
 
 
 class METARParseError(ValueError):
@@ -43,15 +42,15 @@ class SkyCoverEnum(str, Enum):
 
 class SkyLayer(BaseModel):
     cover: SkyCoverEnum
-    height_ft: Optional[int] = None  # hundreds of feet AGL; None for CLR/SKC/CAVOK
-    cloud_type: Optional[str] = None  # CB or TCU if present
+    height_ft: int | None = None  # hundreds of feet AGL; None for CLR/SKC/CAVOK
+    cloud_type: str | None = None  # CB or TCU if present
 
 
 class WindObservation(BaseModel):
-    direction_deg: Optional[int] = None  # None if variable (VRB)
+    direction_deg: int | None = None  # None if variable (VRB)
     variable: bool = False
     speed_kt: int
-    gust_kt: Optional[int] = None
+    gust_kt: int | None = None
     unit: str = "KT"
 
 
@@ -67,15 +66,15 @@ class METARObservation(BaseModel):
     station_id: str
     observation_time: datetime  # UTC, reconstructed with current month/year
     auto: bool = False
-    wind: Optional[WindObservation] = None
-    visibility_m: Optional[int] = None  # in metres; 9999 = ≥10 km
+    wind: WindObservation | None = None
+    visibility_m: int | None = None  # in metres; 9999 = ≥10 km
     rvr: list[str] = []  # raw RVR group strings (R28L/1200FT etc.)
     weather: list[str] = []  # present weather descriptors (e.g. "-RA", "TS")
     sky: list[SkyLayer] = []
-    temp_c: Optional[int] = None
-    dewpoint_c: Optional[int] = None
-    altimeter_inhg: Optional[float] = None  # QNH in inHg when Axxx.x present
-    altimeter_hpa: Optional[int] = None  # QNH in hPa when Qxxxx present
+    temp_c: int | None = None
+    dewpoint_c: int | None = None
+    altimeter_inhg: float | None = None  # QNH in inHg when Axxx.x present
+    altimeter_hpa: int | None = None  # QNH in hPa when Qxxxx present
     remarks: str = ""  # everything after RMK or unrecognised trailing tokens
 
     @field_validator("station_id")
@@ -158,9 +157,9 @@ def parse_metar(raw: str) -> METARObservation:
     hour = int(tm.group("hh"))
     minute = int(tm.group("mm"))
     # Use current UTC year/month; day from METAR
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
-        obs_time = datetime(now.year, now.month, day, hour, minute, tzinfo=timezone.utc)
+        obs_time = datetime(now.year, now.month, day, hour, minute, tzinfo=UTC)
     except ValueError as exc:
         raise METARParseError(f"Invalid date/time group: {exc}") from exc
     idx += 1
@@ -171,15 +170,15 @@ def parse_metar(raw: str) -> METARObservation:
         auto = tokens[idx] == "AUTO"
         idx += 1
 
-    wind: Optional[WindObservation] = None
-    visibility_m: Optional[int] = None
+    wind: WindObservation | None = None
+    visibility_m: int | None = None
     rvr: list[str] = []
     weather: list[str] = []
     sky: list[SkyLayer] = []
-    temp_c: Optional[int] = None
-    dewpoint_c: Optional[int] = None
-    altimeter_inhg: Optional[float] = None
-    altimeter_hpa: Optional[int] = None
+    temp_c: int | None = None
+    dewpoint_c: int | None = None
+    altimeter_inhg: float | None = None
+    altimeter_hpa: int | None = None
     remarks_tokens: list[str] = []
 
     in_remarks = False

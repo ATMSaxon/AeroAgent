@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 from aerosafety.eval.protocols import AgentTraceStub
 from aerosafety.eval.tsr import task_success_rate
 

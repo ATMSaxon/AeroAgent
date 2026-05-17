@@ -19,10 +19,9 @@ EvalAnnotation; nothing is fabricated — if a field is unknown, it raises.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
-from aerosafety.io import AgentTrace, TaskCard, ToolCall
-
+from aerosafety.io import AgentTrace, TaskCard
 
 # ---------------------------------------------------------------------------
 # Per-tool evaluation annotation
@@ -63,7 +62,7 @@ class EvalAnnotation:
         Per-tool-call correctness annotations (same order as trace.tool_calls).
     """
 
-    unsafe_recommendation: Optional[bool] = None
+    unsafe_recommendation: bool | None = None
     unsupported_claims: list[str] = field(default_factory=list)
     hallucinated_evidence: list[str] = field(default_factory=list)
     contradictions: list[str] = field(default_factory=list)

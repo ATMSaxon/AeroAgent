@@ -36,7 +36,6 @@ Dependencies (for infra-architect):
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -67,12 +66,12 @@ class WeatherMinimaResult(BaseModel):
     station_id: str
     approach_category: ApproachCategory
     decision: MinimaDecision
-    observed_visibility_m: Optional[int]
-    observed_ceiling_ft: Optional[int]
+    observed_visibility_m: int | None
+    observed_ceiling_ft: int | None
     required_rvr_ft: int           # baseline from FAA AIM §5-4-7
-    required_ceiling_ft: Optional[int]  # DH from FAA AIM §5-4-7; None = no DH
-    ceiling_ok: Optional[bool]
-    visibility_ok: Optional[bool]
+    required_ceiling_ft: int | None  # DH from FAA AIM §5-4-7; None = no DH
+    ceiling_ok: bool | None
+    visibility_ok: bool | None
     limiting_factor: str           # human-readable explanation
     disclaimer: str = (
         "GENERIC BASELINE ONLY — verify against published IAP for specific "
@@ -89,7 +88,7 @@ class WeatherMinimaResult(BaseModel):
 
 # (required_rvr_ft, required_ceiling_dh_ft)
 # ceiling = None means no DH requirement
-_MINIMUMS: dict[ApproachCategory, tuple[int, Optional[int]]] = {
+_MINIMUMS: dict[ApproachCategory, tuple[int, int | None]] = {
     ApproachCategory.CAT_I:     (1800, 200),
     ApproachCategory.CAT_II:    (1200, 100),
     ApproachCategory.CAT_III_A: (700,  None),
@@ -103,7 +102,7 @@ _MARGINAL_FRACTION = 0.10  # within 10% of minimum is "marginal"
 _M_TO_FT = 3.28084  # 1 metre = 3.28084 feet for RVR comparison
 
 
-def _get_ceiling_ft(metar: METARObservation) -> Optional[int]:
+def _get_ceiling_ft(metar: METARObservation) -> int | None:
     """
     Extract the lowest BKN or OVC layer height as the operational ceiling.
 
@@ -154,7 +153,7 @@ def check_weather_minima(
 
     # Visibility check (compare visibility_m in metres to RVR threshold in feet)
     observed_vis_m = metar.visibility_m
-    visibility_ok: Optional[bool] = None
+    visibility_ok: bool | None = None
     vis_marginal = False
 
     if observed_vis_m is not None:
@@ -171,7 +170,7 @@ def check_weather_minima(
 
     # Ceiling check
     observed_ceiling_ft = _get_ceiling_ft(metar)
-    ceiling_ok: Optional[bool] = None
+    ceiling_ok: bool | None = None
     ceiling_marginal = False
 
     if required_ceiling_ft is None:

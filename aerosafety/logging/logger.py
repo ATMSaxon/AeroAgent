@@ -18,10 +18,9 @@ import platform
 import socket
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from aerosafety.io import AgentTrace
-
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -106,12 +105,12 @@ class ExperimentLogger:
         self.output_path = Path(output_path)
         self._append = append
         self._hardware: dict[str, Any] = _capture_hardware()
-        self._file: Optional[Any] = None
+        self._file: Any | None = None
         self._count = 0
 
     # -- context manager --
 
-    def __enter__(self) -> "ExperimentLogger":
+    def __enter__(self) -> ExperimentLogger:
         if not self.output_path.parent.exists():
             raise FileNotFoundError(
                 f"Log directory does not exist: {self.output_path.parent}. "

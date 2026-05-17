@@ -19,9 +19,8 @@ Dependencies (for infra-architect):
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -51,10 +50,10 @@ class TimeWindowResult(BaseModel):
     """
     query_time_utc: datetime
     window_start_utc: datetime
-    window_end_utc: Optional[datetime]
+    window_end_utc: datetime | None
     status: WindowStatus
-    seconds_until_start: Optional[float] = None  # None if already started
-    seconds_until_end: Optional[float] = None    # None if no end or already expired
+    seconds_until_start: float | None = None  # None if already started
+    seconds_until_end: float | None = None    # None if no end or already expired
 
 
 def _require_utc(dt: datetime, param_name: str) -> None:
@@ -75,7 +74,7 @@ def _require_utc(dt: datetime, param_name: str) -> None:
 def check_time_window(
     query_time: datetime,
     window_start: datetime,
-    window_end: Optional[datetime] = None,
+    window_end: datetime | None = None,
 ) -> TimeWindowResult:
     """
     Determine whether query_time falls within [window_start, window_end).

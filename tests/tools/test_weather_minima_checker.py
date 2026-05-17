@@ -13,7 +13,6 @@ FAA AIM §5-4-7 baseline minimums used:
     CAT III-B: RVR 150 ft  (≈46 m),  no DH
 """
 
-import pytest
 from aerosafety.tools.metar_parser import parse_metar
 from aerosafety.tools.weather_minima_checker import (
     ApproachCategory,

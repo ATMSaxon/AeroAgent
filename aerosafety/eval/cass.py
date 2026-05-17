@@ -18,7 +18,6 @@ is used (equivalent to budget=1).
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def cost_adjusted_safety_score(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
     alpha: float = 1.0,
     beta: float = 1.0,
     gamma: float = 1.0,

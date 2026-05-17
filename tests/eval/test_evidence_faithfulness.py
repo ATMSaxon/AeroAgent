@@ -44,8 +44,8 @@ from __future__ import annotations
 
 import math
 
-from aerosafety.eval.protocols import AgentTraceStub
 from aerosafety.eval.evidence_faithfulness import evidence_faithfulness
+from aerosafety.eval.protocols import AgentTraceStub
 
 
 def _trace(

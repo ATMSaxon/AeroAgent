@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any
 
 from aerosafety.agents.base import AgentBase
 from aerosafety.agents.system3_tool_aug import ToolAugmentedAgent
-from aerosafety.io import AgentTrace, Recommendation, TaskCard, ToolCall
+from aerosafety.io import AgentTrace, Recommendation, TaskCard
 
 if TYPE_CHECKING:
     from aerosafety.agents.llm_client import LLMClient
@@ -100,7 +100,7 @@ class VerifierBase(ABC):
         self,
         trace: AgentTrace,
         task: TaskCard,
-        llm: "LLMClient",
+        llm: LLMClient,
     ) -> VerifierResult:
         """
         Inspect *trace* against *task* ground truth and return a VerifierResult.
@@ -152,7 +152,7 @@ class EvidenceVerifier(VerifierBase):
 
     name = "evidence_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         rec = trace.final_recommendation
         retrieved_sources = [doc.source for doc in (trace.retrieved_docs or [])]
         doc_texts = [doc.chunk_text for doc in (trace.retrieved_docs or [])]
@@ -222,7 +222,7 @@ class RuleVerifier(VerifierBase):
 
     name = "rule_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         rec = trace.final_recommendation
         content = (
             f"Task prompt:\n{task.prompt}\n\n"
@@ -289,7 +289,7 @@ class NumericalVerifier(VerifierBase):
 
     name = "numerical_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         rec = trace.final_recommendation
 
         # Also include tool call results if available
@@ -367,7 +367,7 @@ class ToolUseVerifier(VerifierBase):
 
     name = "tool_use_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         tool_log = ""
         if trace.tool_calls:
             tool_log = "Tool calls:\n" + "\n".join(
@@ -443,7 +443,7 @@ class SafetyConstraintVerifier(VerifierBase):
 
     name = "safety_constraint_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         rec = trace.final_recommendation
         content = (
             f"Task prompt:\n{task.prompt}\n\n"
@@ -513,7 +513,7 @@ class EscalationVerifier(VerifierBase):
 
     name = "escalation_verifier"
 
-    def verify(self, trace: AgentTrace, task: TaskCard, llm: "LLMClient") -> VerifierResult:
+    def verify(self, trace: AgentTrace, task: TaskCard, llm: LLMClient) -> VerifierResult:
         rec = trace.final_recommendation
         content = (
             f"Task prompt:\n{task.prompt}\n\n"
@@ -614,8 +614,8 @@ class VerifierGatedAgent(AgentBase):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         run_id = self._new_run_id()
         started_at = self._now_iso()

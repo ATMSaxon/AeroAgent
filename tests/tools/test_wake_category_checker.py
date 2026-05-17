@@ -6,6 +6,7 @@ Reference: https://www.icao.int/safety/vleap/Pages/Doc-8643.aspx
 """
 
 import pytest
+
 from aerosafety.tools.wake_category_checker import (
     UnknownAircraftTypeError,
     WakeCategory,

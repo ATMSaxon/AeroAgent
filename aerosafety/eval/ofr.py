@@ -20,7 +20,7 @@ DEFAULT_CONFIDENCE_THRESHOLD = 0.8
 
 
 def overconfident_failure_rate(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
 ) -> dict:
     """

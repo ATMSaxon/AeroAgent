@@ -1,6 +1,5 @@
 """Tests for aerosafety.determinism."""
 
-import os
 
 import pytest
 

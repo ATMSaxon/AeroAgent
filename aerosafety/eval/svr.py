@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def safety_violation_rate(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
 ) -> dict:
     """
     Compute SVR over a list of AgentTrace objects.

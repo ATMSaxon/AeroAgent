@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 def evidence_faithfulness(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
 ) -> dict:
     """
     Compute all four Evidence Faithfulness sub-metrics.

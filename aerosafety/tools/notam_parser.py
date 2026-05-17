@@ -22,8 +22,7 @@ Domestic US D-NOTAMs in older plain-text format may not parse correctly.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
@@ -66,16 +65,16 @@ class NOTAMObservation(BaseModel):
     series: str                        # NOTAM series letter (A-Z)
     number: str                        # NOTAM number (e.g. 1234/24)
     notam_type: str                    # N(ew)/R(eplacement)/C(ancellation)
-    q_line: Optional[QLine] = None
+    q_line: QLine | None = None
     location: str                      # A) field — ICAO location indicator
-    effective_from: Optional[datetime] = None  # B) field — UTC
-    effective_to: Optional[datetime] = None    # C) field — UTC; None if PERM
+    effective_from: datetime | None = None  # B) field — UTC
+    effective_to: datetime | None = None    # C) field — UTC; None if PERM
     permanent: bool = False            # True if C) field is PERM
     estimated: bool = False            # True if C) field has suffix EST
-    schedule: Optional[str] = None    # D) field (schedule string, optional)
+    schedule: str | None = None    # D) field (schedule string, optional)
     text: str = ""                     # E) field — plain-language description
-    lower_limit: Optional[str] = None # F) field (lower limit, optional)
-    upper_limit: Optional[str] = None # G) field (upper limit, optional)
+    lower_limit: str | None = None # F) field (lower limit, optional)
+    upper_limit: str | None = None # G) field (upper limit, optional)
     affected_runways: list[str] = []   # runway IDs extracted from E text
     affected_taxiways: list[str] = []  # taxiway IDs extracted from E text
 
@@ -106,11 +105,12 @@ _FIELD_RE = re.compile(
 # Datetime: YYMMDDHHmm (10 digits)
 _DT_RE = re.compile(r"(?P<yy>\d{2})(?P<mo>\d{2})(?P<dd>\d{2})(?P<hh>\d{2})(?P<mm>\d{2})")
 
-# Runway extraction: find each RWY/RW keyword, then collect all \d{2}[LRC]?
+# Runway extraction: find each RWY/RWYS/RW keyword, then collect all \d{2}[LRC]?
 # identifiers within the next 40 characters, stopping before the first
 # 4+-letter word that is not AND/OR (e.g. stop at CLOSED, FOR, MAINTENANCE).
-# Handles: "RWY 13R/31L", "RWY 13R AND 31L", "RWY 09", "RWY 13/31".
-_RWY_ANCHOR_RE = re.compile(r"\bRW(?:Y)?\b", re.IGNORECASE)
+# Handles: "RWY 13R/31L", "RWY 13R AND 31L", "RWY 13R AND RWY 31L",
+#          "RWYS 13R, 31L", "RWY 09", "RWY 13/31".
+_RWY_ANCHOR_RE = re.compile(r"\bRW(?:YS?|S)?\b", re.IGNORECASE)
 _RWY_ID_RE = re.compile(r"\b(\d{2}[LRC]?)\b")
 _RWY_STOP_RE = re.compile(r"\b(?!AND\b|OR\b)[A-Z]{4,}\b", re.IGNORECASE)
 
@@ -118,7 +118,7 @@ _RWY_STOP_RE = re.compile(r"\b(?!AND\b|OR\b)[A-Z]{4,}\b", re.IGNORECASE)
 _TWY_RE = re.compile(r"\bTWY\s+(?P<id>[A-Z][A-Z0-9]*)\b")
 
 
-def _parse_notam_dt(s: str, century_year: int) -> Optional[datetime]:
+def _parse_notam_dt(s: str, century_year: int) -> datetime | None:
     """Parse a 10-digit NOTAM datetime string to UTC datetime."""
     s = s.strip()
     if s in ("PERM", "UFN", ""):
@@ -133,7 +133,7 @@ def _parse_notam_dt(s: str, century_year: int) -> Optional[datetime]:
     mm = int(m.group("mm"))
     full_year = (century_year // 100) * 100 + yy
     try:
-        return datetime(full_year, mo, dd, hh, mm, tzinfo=timezone.utc)
+        return datetime(full_year, mo, dd, hh, mm, tzinfo=UTC)
     except ValueError as exc:
         raise NOTAMParseError(f"Invalid NOTAM datetime '{s}': {exc}") from exc
 
@@ -153,7 +153,7 @@ def parse_notam(raw: str) -> NOTAMObservation:
     CLAUDE.md §8.1: no silent failure.
     """
     raw = raw.strip()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Header
     hdr = _HDR_RE.search(raw)
@@ -166,7 +166,7 @@ def parse_notam(raw: str) -> NOTAMObservation:
     notam_type = hdr.group("type")
 
     # Q-line
-    q_line: Optional[QLine] = None
+    q_line: QLine | None = None
     qm = _Q_RE.search(raw)
     if qm:
         code = qm.group("code")
@@ -201,7 +201,7 @@ def parse_notam(raw: str) -> NOTAMObservation:
     c_raw = fields.get("C", "").upper()
     permanent = False
     estimated = False
-    effective_to: Optional[datetime] = None
+    effective_to: datetime | None = None
     if c_raw:
         if "PERM" in c_raw:
             permanent = True

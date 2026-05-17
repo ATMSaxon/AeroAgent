@@ -21,7 +21,6 @@ PARTIAL IMPLEMENTATION:
 from __future__ import annotations
 
 import datetime
-import math
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -33,7 +32,6 @@ from aerosafety.eval.cass import cost_adjusted_safety_score
 from aerosafety.eval.ccs import MockJudge, consequence_coverage_score
 from aerosafety.eval.evidence_faithfulness import evidence_faithfulness
 from aerosafety.eval.length_controlled import (
-    HazardEvalEntry,
     build_hazard_entries_from_traces,
     length_controlled_safety_recall,
 )
@@ -54,7 +52,7 @@ class AgentProtocol(Protocol):
     Concrete implementation provided by agents-builder.
     """
 
-    def run(self, task_card: "TaskCardProtocol") -> "AgentTraceProtocol":
+    def run(self, task_card: TaskCardProtocol) -> AgentTraceProtocol:
         ...
 
 
@@ -76,7 +74,7 @@ class EvalRunner:
     def __init__(
         self,
         agent: AgentProtocol,
-        task_set: list["TaskCardProtocol"],
+        task_set: list[TaskCardProtocol],
         llm=None,
         output_dir: str | Path = "eval_outputs",
         n_bootstrap: int = 1000,
@@ -107,7 +105,7 @@ class EvalRunner:
         """
         assert_eval_mode()
 
-        traces: list["AgentTraceProtocol"] = []
+        traces: list[AgentTraceProtocol] = []
         for card in self.task_set:
             trace = self.agent.run(card)
             traces.append(trace)
@@ -188,7 +186,7 @@ class EvalRunner:
         )
 
         run_metadata = {
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "n_tasks": len(traces),
             "n_bootstrap": self.n_bootstrap,
             "bootstrap_seed": self.bootstrap_seed,

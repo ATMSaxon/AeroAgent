@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from aerosafety.io import AgentTrace, TaskCard, TaskProvenance, ToolCall
+from aerosafety.io import AgentTrace, TaskCard, ToolCall
 
 
 def test_task_card_round_trip(synthetic_task_card: TaskCard) -> None:

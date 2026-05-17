@@ -6,8 +6,8 @@ and that OpenAI / Anthropic export formats are correct.
 """
 
 import pytest
+
 from aerosafety.tools.registry import (
-    ToolDescriptor,
     get_tool,
     list_tools,
     to_anthropic_tools,

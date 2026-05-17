@@ -63,8 +63,8 @@ class MockJudge:
 
 
 def consequence_coverage_score(
-    traces: list["AgentTraceProtocol"],
-    task_cards: list["TaskCardProtocol"],
+    traces: list[AgentTraceProtocol],
+    task_cards: list[TaskCardProtocol],
     judge: Judge | None = None,
 ) -> dict:
     """

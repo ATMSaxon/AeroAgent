@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import abc
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from aerosafety.io import AgentTrace, TaskCard
@@ -35,8 +35,8 @@ class AgentBase(abc.ABC):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         """
         Execute the agent on *task* using *llm* and optionally *tools*.
@@ -72,7 +72,7 @@ class AgentBase(abc.ABC):
 
     @staticmethod
     def _now_iso() -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     @staticmethod
     def _ms_since(start_ns: int) -> float:

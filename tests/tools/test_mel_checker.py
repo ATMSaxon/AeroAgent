@@ -12,7 +12,8 @@ Reference: https://fsims.faa.gov/wdocs/8900.1/
 """
 
 import pytest
-from aerosafety.tools.mel_checker import check_mel, MELCheckResult
+
+from aerosafety.tools.mel_checker import MELCheckResult, check_mel
 
 
 class TestMELCheckerMockBehavior:

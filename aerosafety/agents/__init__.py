@@ -18,7 +18,7 @@ from aerosafety.agents.base import AgentBase
 from aerosafety.agents.llm_client import LLMClient
 from aerosafety.agents.mock_llm import MockLLM
 from aerosafety.agents.system1_direct import DirectLLMAgent
-from aerosafety.agents.system2_rag import RAGAgent, BM25Retriever, Retriever
+from aerosafety.agents.system2_rag import BM25Retriever, RAGAgent, Retriever
 from aerosafety.agents.system3_tool_aug import ToolAugmentedAgent
 from aerosafety.agents.system4_multi_agent import MultiAgentSystem
 from aerosafety.agents.system5_aero_sft import AeroSFTAgent

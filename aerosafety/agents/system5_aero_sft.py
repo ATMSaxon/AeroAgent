@@ -47,8 +47,8 @@ class AeroSFTAgent(AgentBase):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         raise NotImplementedError(
             "System 5 (AeroSFTAgent): NOT IMPLEMENTED. "

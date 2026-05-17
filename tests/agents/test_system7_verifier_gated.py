@@ -26,7 +26,6 @@ from aerosafety.agents.system7_verifier_gated import (
 )
 from aerosafety.io import AgentTrace, TaskCard
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

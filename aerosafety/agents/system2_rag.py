@@ -23,9 +23,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Literal
 
-from aerosafety.io import AgentTrace, Recommendation, RetrievedDoc, TaskCard
-
 from aerosafety.agents.base import AgentBase
+from aerosafety.io import AgentTrace, Recommendation, RetrievedDoc, TaskCard
 
 if TYPE_CHECKING:
     from aerosafety.agents.llm_client import LLMClient
@@ -66,7 +65,7 @@ class BM25Retriever(Retriever):
         self._corpus = corpus
         if corpus:
             tokenized = [text.lower().split() for _, _, text in corpus]
-            self._bm25: "BM25Okapi | None" = BM25Okapi(tokenized)
+            self._bm25: BM25Okapi | None = BM25Okapi(tokenized)
         else:
             self._bm25 = None
 
@@ -174,8 +173,8 @@ class RAGAgent(AgentBase):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         run_id = self._new_run_id()
         started_at = self._now_iso()
@@ -216,7 +215,7 @@ class RAGAgent(AgentBase):
         retrieved_docs: list[RetrievedDoc] = []
         try:
             retrieved_docs = self.retriever.retrieve(retrieval_query, top_k=self.top_k)
-        except Exception as exc:
+        except Exception:
             had_retrieval_error = True
             # Do NOT silently swallow — record and continue with empty docs
             # (agent must still produce a trace, not crash the eval loop)

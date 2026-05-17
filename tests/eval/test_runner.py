@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
-from aerosafety.eval.protocols import AgentTraceStub, TaskCardStub, ToolCallStub
+from aerosafety.eval.protocols import AgentTraceStub, TaskCardStub
 from aerosafety.eval.runner import EvalRunner
 
 

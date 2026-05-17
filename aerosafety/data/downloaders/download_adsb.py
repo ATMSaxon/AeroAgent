@@ -27,10 +27,8 @@ Citation:
 from __future__ import annotations
 
 import logging
-import os
 import sys
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 from aerosafety.data.downloaders._base import RAW_DATA_DIR
 
@@ -125,14 +123,15 @@ def download_adsb_trajectories(
     traffic_data.to_parquet(dest)
     logger.info("ADS-B data saved to %s", dest)
 
-    from aerosafety.data.downloaders._base import _write_manifest_entry
     import hashlib
+
+    from aerosafety.data.downloaders._base import _write_manifest_entry
 
     sha = hashlib.sha256(dest.read_bytes()).hexdigest()
     _write_manifest_entry({
         "source_id": SOURCE_ID,
         "url_fetched": f"opensky://impala/{airport}",
-        "access_timestamp": datetime.now(timezone.utc).isoformat(),
+        "access_timestamp": datetime.now(UTC).isoformat(),
         "local_file_path": str(dest),
         "sha256": sha,
         "http_status_code": 200,
@@ -143,9 +142,8 @@ def download_adsb_trajectories(
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    from datetime import date
-    start_dt = datetime(2023, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
-    end_dt = datetime(2023, 6, 1, 6, 0, 0, tzinfo=timezone.utc)
+    start_dt = datetime(2023, 6, 1, 0, 0, 0, tzinfo=UTC)
+    end_dt = datetime(2023, 6, 1, 6, 0, 0, tzinfo=UTC)
     download_adsb_trajectories("KLAX", start_dt, end_dt, dry_run=True)
     logger.info(
         "Dry run complete. Register at opensky-network.org and get "

@@ -14,9 +14,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +68,7 @@ def fetch_url(
     """
     _ensure_dirs(destination_path.parent)
     sess = session or requests.Session()
-    access_ts = datetime.now(timezone.utc)
+    access_ts = datetime.now(UTC)
 
     logger.info("FETCH source_id=%s url=%s -> %s", source_id, url, destination_path)
 
@@ -135,7 +134,7 @@ def fetch_json_api(
     Logs the request and raises on non-2xx responses.
     """
     sess = session or requests.Session()
-    access_ts = datetime.now(timezone.utc)
+    access_ts = datetime.now(UTC)
 
     logger.info(
         "API CALL source_id=%s url=%s params=%s", source_id, url, params

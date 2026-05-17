@@ -6,9 +6,10 @@ Reference: https://library.wmo.int/records/item/35713
 """
 
 import pytest
+
 from aerosafety.tools.taf_parser import (
-    TAFParseError,
     ChangeIndicator,
+    TAFParseError,
     parse_taf,
 )
 

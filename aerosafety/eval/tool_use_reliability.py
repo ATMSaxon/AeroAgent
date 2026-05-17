@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
 
 def tool_use_reliability(
-    traces: list["AgentTraceProtocol"],
-    task_cards: list["TaskCardProtocol"],
+    traces: list[AgentTraceProtocol],
+    task_cards: list[TaskCardProtocol],
 ) -> dict:
     """
     Compute all five Tool-Use Reliability sub-metrics.

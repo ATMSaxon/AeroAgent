@@ -33,7 +33,7 @@ SEVERITY_WEIGHTS: dict[str, int] = {
 
 
 def severity_weighted_failure_rate(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
     weights: dict[str, int] | None = None,
 ) -> dict:
     """

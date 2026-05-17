@@ -9,8 +9,8 @@ Standard: FAA-H-8083-25C Chapter 5
 Reference: https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/phak
 """
 
-import math
 import pytest
+
 from aerosafety.tools.wind_component import (
     WindComponentError,
     calculate_wind_components,

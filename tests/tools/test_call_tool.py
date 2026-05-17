@@ -6,13 +6,14 @@ and re-raise behaviour (CLAUDE.md §8.1).
 """
 
 import pytest
+
 from aerosafety.io import ToolCall
 from aerosafety.tools import call_tool
-from aerosafety.tools.wind_component import (
-    calculate_wind_components,
-    WindComponentError,
-)
 from aerosafety.tools.separation_calculator import calculate_vertical_separation
+from aerosafety.tools.wind_component import (
+    WindComponentError,
+    calculate_wind_components,
+)
 
 
 class TestCallToolSuccess:

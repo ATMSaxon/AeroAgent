@@ -9,9 +9,9 @@ Reference: https://library.wmo.int/records/item/35713
 """
 
 import pytest
+
 from aerosafety.tools.metar_parser import (
     METARParseError,
-    METARObservation,
     SkyCoverEnum,
     parse_metar,
 )

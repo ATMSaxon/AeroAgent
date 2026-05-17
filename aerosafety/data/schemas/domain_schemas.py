@@ -14,13 +14,10 @@ Coordination note (T1 dependency):
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
 
 # ── Enums ──────────────────────────────────────────────────────────────────
 
@@ -108,7 +105,7 @@ class Provenance(BaseModel):
     )
 
     @model_validator(mode="after")
-    def synthetic_must_have_note(self) -> "Provenance":
+    def synthetic_must_have_note(self) -> Provenance:
         if self.origin == DataOrigin.SYNTHETIC and not self.synthetic_generation_note:
             raise ValueError(
                 "synthetic_generation_note is required when origin=SYNTHETIC "
@@ -155,7 +152,7 @@ class RawDocument(BaseModel):
     notes: str | None = None
 
     @model_validator(mode="after")
-    def doc_id_format(self) -> "RawDocument":
+    def doc_id_format(self) -> RawDocument:
         if self.provenance.sha256:
             expected = f"{self.provenance.source_id}_{self.provenance.sha256[:12]}"
             if self.doc_id != expected:
@@ -290,7 +287,7 @@ class KnowledgePoint(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def synthetic_kp_requires_note(self) -> "KnowledgePoint":
+    def synthetic_kp_requires_note(self) -> KnowledgePoint:
         if self.provenance.origin == DataOrigin.SYNTHETIC:
             if not self.provenance.synthetic_generation_note:
                 raise ValueError(

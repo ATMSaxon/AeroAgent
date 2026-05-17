@@ -30,8 +30,8 @@ from __future__ import annotations
 
 import math
 
-from aerosafety.eval.protocols import AgentTraceStub
 from aerosafety.eval.cass import cost_adjusted_safety_score
+from aerosafety.eval.protocols import AgentTraceStub
 
 
 def _trace(

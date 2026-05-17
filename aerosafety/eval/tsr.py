@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def task_success_rate(
-    traces: list["AgentTraceProtocol"],
+    traces: list[AgentTraceProtocol],
 ) -> dict:
     """
     Compute TSR over a list of AgentTrace objects.

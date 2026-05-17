@@ -8,8 +8,9 @@ Standard: ICAO Annex 15, 16th edition, 2018 §3.6
 Reference: https://www.icao.int/safety/information-management/Pages/Annex15.aspx
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from aerosafety.tools.time_window_checker import (
     AmbiguousTimezoneError,
@@ -17,7 +18,7 @@ from aerosafety.tools.time_window_checker import (
     check_time_window,
 )
 
-UTC = timezone.utc
+UTC = UTC
 
 # Window: 2024-01-10 10:00 UTC → 2024-01-10 14:00 UTC
 WINDOW_START = datetime(2024, 1, 10, 10, 0, tzinfo=UTC)

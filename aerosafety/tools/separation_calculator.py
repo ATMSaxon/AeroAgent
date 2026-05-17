@@ -27,6 +27,7 @@ Dependencies (for infra-architect):
 from __future__ import annotations
 
 import math
+
 from pydantic import BaseModel
 
 

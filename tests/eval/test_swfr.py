@@ -38,7 +38,7 @@ import math
 import pytest
 
 from aerosafety.eval.protocols import AgentTraceStub
-from aerosafety.eval.swfr import severity_weighted_failure_rate, SEVERITY_WEIGHTS
+from aerosafety.eval.swfr import severity_weighted_failure_rate
 
 
 def _trace(task_id: str, pred: str, gold: str, severity: str) -> AgentTraceStub:

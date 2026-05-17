@@ -29,17 +29,13 @@ Citation:
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
-from datetime import date, datetime, timezone
-from pathlib import Path
+from datetime import date
 
 from aerosafety.data.downloaders._base import (
     RAW_DATA_DIR,
-    fetch_json_api,
     fetch_url,
-    _write_manifest_entry,
 )
 
 logger = logging.getLogger(__name__)

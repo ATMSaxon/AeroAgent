@@ -8,15 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from aerosafety.io import AgentTrace, Recommendation, TaskCard, TaskProvenance, ToolCall
 from aerosafety.eval.adapters import (
-    AnnotatedToolCall,
     EvalAnnotation,
     EvalTaskCard,
-    EvalView,
     ToolCallAnnotation,
     make_eval_view,
 )
+from aerosafety.io import AgentTrace, Recommendation, TaskCard, TaskProvenance, ToolCall
 
 
 def _make_task_card(task_id: str = "T001", severity: str = "High") -> TaskCard:

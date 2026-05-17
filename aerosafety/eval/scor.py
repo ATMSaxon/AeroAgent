@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
 
 def safety_constraint_omission_rate(
-    traces: list["AgentTraceProtocol"],
-    task_cards: list["TaskCardProtocol"],
+    traces: list[AgentTraceProtocol],
+    task_cards: list[TaskCardProtocol],
 ) -> dict:
     """
     Compute SCOR over paired traces and task cards.

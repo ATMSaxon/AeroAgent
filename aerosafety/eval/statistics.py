@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Callable, Sequence
-
+from collections.abc import Callable, Sequence
 
 # ---------------------------------------------------------------------------
 # Bootstrap CI

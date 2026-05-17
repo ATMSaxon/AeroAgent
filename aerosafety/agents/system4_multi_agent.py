@@ -148,8 +148,8 @@ class MultiAgentSystem(AgentBase):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         run_id = self._new_run_id()
         started_at = self._now_iso()

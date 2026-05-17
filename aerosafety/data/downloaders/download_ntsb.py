@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from pathlib import Path
 
 from aerosafety.data.downloaders._base import RAW_DATA_DIR, fetch_url
 

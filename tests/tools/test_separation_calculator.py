@@ -10,8 +10,8 @@ Haversine formula: Sinnott, R.W. (1984), Sky and Telescope, 68(2), 159.
 Earth radius: 3440.065 NM (mean sphere approximation)
 """
 
-import math
 import pytest
+
 from aerosafety.tools.separation_calculator import (
     SeparationError,
     calculate_horizontal_separation,

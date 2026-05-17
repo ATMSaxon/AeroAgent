@@ -48,7 +48,7 @@ def require_env(var: str) -> str:
     """
     val = os.environ.get(var, "")
     if not val:
-        raise EnvironmentError(
+        raise OSError(
             f"Required environment variable '{var}' is not set. "
             "Check your .env file and ensure it is sourced before running."
         )

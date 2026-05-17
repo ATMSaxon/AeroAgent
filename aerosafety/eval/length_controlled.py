@@ -28,7 +28,7 @@ newline-split list) or an explicit hazard_predictions argument.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -119,8 +119,8 @@ def length_controlled_safety_recall(
 
 
 def build_hazard_entries_from_traces(
-    traces: list["AgentTraceProtocol"],
-    task_cards: list["TaskCardProtocol"],
+    traces: list[AgentTraceProtocol],
+    task_cards: list[TaskCardProtocol],
 ) -> list[HazardEvalEntry]:
     """
     Convenience builder: construct HazardEvalEntry list from generic AgentTrace

@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import math
 
-from aerosafety.eval.protocols import AgentTraceStub
 from aerosafety.eval.ofr import overconfident_failure_rate
+from aerosafety.eval.protocols import AgentTraceStub
 
 
 def _trace(task_id: str, pred: str, gold: str, confidence: float) -> AgentTraceStub:

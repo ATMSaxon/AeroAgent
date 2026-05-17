@@ -39,8 +39,8 @@ import math
 
 import pytest
 
-from aerosafety.eval.protocols import AgentTraceStub, TaskCardStub
 from aerosafety.eval.ccs import MockJudge, consequence_coverage_score
+from aerosafety.eval.protocols import AgentTraceStub, TaskCardStub
 
 
 def _trace(task_id: str, pred: str) -> AgentTraceStub:

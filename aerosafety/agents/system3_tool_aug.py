@@ -95,7 +95,7 @@ class _StubToolRegistry:
         return _AVAILABLE_TOOLS_STUB
 
 
-def _get_registry(tools: "ToolRegistry | None") -> Any:
+def _get_registry(tools: ToolRegistry | None) -> Any:
     """Return the provided registry, or the stub if tools-builder hasn't shipped."""
     if tools is not None:
         return tools
@@ -120,8 +120,8 @@ class ToolAugmentedAgent(AgentBase):
     def run(
         self,
         task: TaskCard,
-        llm: "LLMClient",
-        tools: "ToolRegistry | None" = None,
+        llm: LLMClient,
+        tools: ToolRegistry | None = None,
     ) -> AgentTrace:
         run_id = self._new_run_id()
         started_at = self._now_iso()

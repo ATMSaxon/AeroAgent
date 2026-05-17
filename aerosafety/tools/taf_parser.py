@@ -21,23 +21,20 @@ research-grade and does not implement the full FM 51 grammar.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
 from aerosafety.tools.metar_parser import (
-    METARParseError,
-    SkyLayer,
-    SkyCoverEnum,
-    WindObservation,
-    _WIND_RE,
-    _VIS_RE,
-    _SKY_RE,
     _CLR_RE,
+    _SKY_RE,
+    _VIS_RE,
     _WEATHER_RE,
-    _parse_temp,
+    _WIND_RE,
+    SkyCoverEnum,
+    SkyLayer,
+    WindObservation,
     _mps_to_kt,
 )
 
@@ -56,8 +53,8 @@ class ChangeIndicator(str, Enum):
 
 class TAFConditions(BaseModel):
     """Weather conditions in a TAF base or change group."""
-    wind: Optional[WindObservation] = None
-    visibility_m: Optional[int] = None
+    wind: WindObservation | None = None
+    visibility_m: int | None = None
     weather: list[str] = []
     sky: list[SkyLayer] = []
     remarks: str = ""
@@ -70,8 +67,8 @@ class TAFChangeGroup(BaseModel):
     Standard: WMO No. 306 Vol. I.1, FM 51-XVI §15.6
     """
     indicator: ChangeIndicator
-    valid_from: Optional[datetime] = None   # UTC
-    valid_to: Optional[datetime] = None     # UTC
+    valid_from: datetime | None = None   # UTC
+    valid_to: datetime | None = None     # UTC
     conditions: TAFConditions
 
 
@@ -108,18 +105,18 @@ def _make_utc(year: int, month: int, day: int, hour: int, minute: int = 0) -> da
     # Hour 24 means midnight of next day (WMO convention for TAF end times)
     if hour == 24:
         from datetime import timedelta
-        base = datetime(year, month, day, 0, 0, tzinfo=timezone.utc)
+        base = datetime(year, month, day, 0, 0, tzinfo=UTC)
         return base + timedelta(days=1)
     try:
-        return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+        return datetime(year, month, day, hour, minute, tzinfo=UTC)
     except ValueError as exc:
         raise TAFParseError(f"Invalid date components day={day} hour={hour}: {exc}") from exc
 
 
 def _parse_conditions(tokens: list[str]) -> TAFConditions:
     """Parse a flat list of condition tokens into a TAFConditions object."""
-    wind: Optional[WindObservation] = None
-    visibility_m: Optional[int] = None
+    wind: WindObservation | None = None
+    visibility_m: int | None = None
     weather: list[str] = []
     sky: list[SkyLayer] = []
     remainder: list[str] = []
@@ -211,7 +208,7 @@ def parse_taf(raw: str) -> TAFObservation:
         raise TAFParseError(f"Too few tokens to be a valid TAF: {raw!r}")
 
     idx = 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Optional TAF type identifier
     if tokens[idx] == "TAF":
@@ -299,8 +296,8 @@ def parse_taf(raw: str) -> TAFObservation:
         if tok in ("BECMG", "TEMPO"):
             indicator = ChangeIndicator(tok)
             idx += 1
-            grp_from: Optional[datetime] = None
-            grp_to: Optional[datetime] = None
+            grp_from: datetime | None = None
+            grp_to: datetime | None = None
             if idx < len(tokens) and _TEMPO_BECMG_VALID_RE.match(tokens[idx]):
                 gv = _TEMPO_BECMG_VALID_RE.match(tokens[idx])
                 grp_from = _make_utc(now.year, now.month, int(gv.group("d1")), int(gv.group("h1")))

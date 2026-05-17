@@ -8,8 +8,8 @@ References:
 """
 
 import pytest
-from aerosafety.tools.notam_parser import NOTAMParseError, parse_notam
 
+from aerosafety.tools.notam_parser import NOTAMParseError, parse_notam
 
 # Minimal ICAO-format NOTAM (A-series, NOTAMN, fields A-E)
 SAMPLE_NOTAM = """
@@ -100,6 +100,18 @@ class TestNOTAMParser:
         assert obs.q_line is not None
         assert obs.q_line.fir == "KZNY"
         assert obs.q_line.notam_code == "QMRLC"
+
+    def test_runway_and_rwy_dual_keyword(self):
+        """RWY 13R AND RWY 31L (two separate RWY keywords) must both be found."""
+        notam = """A9001/24 NOTAMN
+Q) KZNY/QMRLC/IV/NBO/A/000/999/4038N07356W025
+A) KJFK
+B) 2406010000
+C) 2406012359
+E) RWY 13R AND RWY 31L CLOSED FOR WORK IN PROGRESS"""
+        obs = parse_notam(notam)
+        assert "13R" in obs.affected_runways
+        assert "31L" in obs.affected_runways
 
     def test_missing_header_raises(self):
         with pytest.raises(NOTAMParseError):
