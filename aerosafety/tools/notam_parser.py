@@ -1,0 +1,242 @@
+"""
+NOTAM parser conforming to ICAO Annex 15 (16th edition, 2018) and
+FAA Order JO 7930.2S — Notices to Air Missions.
+
+References:
+    ICAO Annex 15, 16th edition, 2018 — Aeronautical Information Services
+    https://www.icao.int/safety/information-management/Pages/Annex15.aspx
+
+    FAA Order JO 7930.2S — Notices to Air Missions (NOTAMs)
+    https://www.faa.gov/regulations_policies/orders_notices/index.cfm/go/document.information/documentID/1038268
+
+Format covered: ICAO NOTAM (Series/Number/Year, Q/A/B/C/D/E/F/G fields)
+as distributed via ICAO SNOWFLAKE / AFTN format.
+
+Dependencies (for infra-architect):
+    pydantic >= 2.0
+
+LIMITATION: The parser handles the standard structured NOTAM format.
+Domestic US D-NOTAMs in older plain-text format may not parse correctly.
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+class NOTAMParseError(ValueError):
+    """Raised when the NOTAM string cannot be parsed."""
+
+
+class QLine(BaseModel):
+    """
+    Decoded NOTAM Q-line.
+
+    ICAO Annex 15, Appendix 6, §6.2:
+      Q) FIR/NOTAM_CODE/TRAFFIC/PURPOSE/SCOPE/LOWER/UPPER/COORDINATES
+    """
+    fir: str                       # Flight Information Region (e.g. KZNY)
+    notam_code: str                # ICAO NOTAM code (e.g. QMRLC = runway light change)
+    traffic: str                   # IV/V/K (IFR, VFR, ...)
+    purpose: str                   # N/B/O/M/K (Normal, Briefing, ...)
+    scope: str                     # A/AE/AW/E/W (Aerodrome, En-route, ...)
+    lower_fl: int                  # lower flight level limit (000 = ground)
+    upper_fl: int                  # upper flight level limit
+    coordinates: str               # lat/lon centre + radius (e.g. 5129N00028W005)
+    subject: str                   # first 2 chars of notam_code (subject)
+    condition: str                 # chars 3-4 of notam_code (condition)
+
+
+class NOTAMObservation(BaseModel):
+    """
+    Parsed NOTAM observation.
+
+    Standards:
+        ICAO Annex 15, 16th edition, 2018
+        FAA Order JO 7930.2S
+    References:
+        https://www.icao.int/safety/information-management/Pages/Annex15.aspx
+        https://www.faa.gov/regulations_policies/orders_notices
+    """
+    raw: str
+    series: str                        # NOTAM series letter (A-Z)
+    number: str                        # NOTAM number (e.g. 1234/24)
+    notam_type: str                    # N(ew)/R(eplacement)/C(ancellation)
+    q_line: Optional[QLine] = None
+    location: str                      # A) field — ICAO location indicator
+    effective_from: Optional[datetime] = None  # B) field — UTC
+    effective_to: Optional[datetime] = None    # C) field — UTC; None if PERM
+    permanent: bool = False            # True if C) field is PERM
+    estimated: bool = False            # True if C) field has suffix EST
+    schedule: Optional[str] = None    # D) field (schedule string, optional)
+    text: str = ""                     # E) field — plain-language description
+    lower_limit: Optional[str] = None # F) field (lower limit, optional)
+    upper_limit: Optional[str] = None # G) field (upper limit, optional)
+    affected_runways: list[str] = []   # runway IDs extracted from E text
+    affected_taxiways: list[str] = []  # taxiway IDs extracted from E text
+
+
+# ---------------------------------------------------------------------------
+# Regex patterns
+# ---------------------------------------------------------------------------
+
+# NOTAM header: series + number  e.g.  A1234/24 NOTAMN
+_HDR_RE = re.compile(
+    r"(?P<series>[A-Z])(?P<num>\d{4}/\d{2,4})\s+NOTAM(?P<type>[NRC])"
+)
+
+# Q-line
+_Q_RE = re.compile(
+    r"Q\)\s*(?P<fir>[A-Z]{4})/(?P<code>Q[A-Z]{4})/(?P<tfc>[A-Z/]+)/"
+    r"(?P<purp>[A-Z/]+)/(?P<scope>[A-Z/]+)/(?P<lower>\d{3})/(?P<upper>\d{3})/"
+    r"(?P<coords>[0-9NS]{4,5}[EW]\d{3,5}[EW]\d{3})"
+)
+
+# Simple field extractors — each line begins with letter and )
+_FIELD_RE = re.compile(
+    r"\b(?P<field>[A-G])\)\s*(?P<value>[^\n]+?)(?=\s+[A-G]\)|$)", re.DOTALL
+)
+
+# Datetime: YYMMDDHHmm (10 digits)
+_DT_RE = re.compile(r"(?P<yy>\d{2})(?P<mo>\d{2})(?P<dd>\d{2})(?P<hh>\d{2})(?P<mm>\d{2})")
+
+# Runway pattern: RWY nn[LRC] or RW nn[LRC] in E text
+_RWY_RE = re.compile(r"\bRW(?:Y)?\s*(?P<id>\d{2}[LRC]?)\b")
+
+# Taxiway pattern: TWY [A-Z]+[0-9]* in E text
+_TWY_RE = re.compile(r"\bTWY\s+(?P<id>[A-Z][A-Z0-9]*)\b")
+
+
+def _parse_notam_dt(s: str, century_year: int) -> Optional[datetime]:
+    """Parse a 10-digit NOTAM datetime string to UTC datetime."""
+    s = s.strip()
+    if s in ("PERM", "UFN", ""):
+        return None
+    m = _DT_RE.match(s)
+    if not m:
+        raise NOTAMParseError(f"Cannot parse NOTAM datetime '{s}'")
+    yy = int(m.group("yy"))
+    mo = int(m.group("mo"))
+    dd = int(m.group("dd"))
+    hh = int(m.group("hh"))
+    mm = int(m.group("mm"))
+    full_year = (century_year // 100) * 100 + yy
+    try:
+        return datetime(full_year, mo, dd, hh, mm, tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise NOTAMParseError(f"Invalid NOTAM datetime '{s}': {exc}") from exc
+
+
+def parse_notam(raw: str) -> NOTAMObservation:
+    """
+    Parse an ICAO-format NOTAM string.
+
+    Standards:
+        ICAO Annex 15, 16th edition, 2018
+        FAA Order JO 7930.2S
+    References:
+        https://www.icao.int/safety/information-management/Pages/Annex15.aspx
+        https://www.faa.gov/regulations_policies/orders_notices
+
+    Raises NOTAMParseError on any parsing failure.
+    CLAUDE.md §8.1: no silent failure.
+    """
+    raw = raw.strip()
+    now = datetime.now(timezone.utc)
+
+    # Header
+    hdr = _HDR_RE.search(raw)
+    if not hdr:
+        raise NOTAMParseError(
+            f"Cannot find NOTAM header (series+number+type) in: {raw[:80]!r}"
+        )
+    series = hdr.group("series")
+    number = hdr.group("num")
+    notam_type = hdr.group("type")
+
+    # Q-line
+    q_line: Optional[QLine] = None
+    qm = _Q_RE.search(raw)
+    if qm:
+        code = qm.group("code")
+        q_line = QLine(
+            fir=qm.group("fir"),
+            notam_code=code,
+            traffic=qm.group("tfc"),
+            purpose=qm.group("purp"),
+            scope=qm.group("scope"),
+            lower_fl=int(qm.group("lower")),
+            upper_fl=int(qm.group("upper")),
+            coordinates=qm.group("coords"),
+            subject=code[1:3] if len(code) >= 3 else code,
+            condition=code[3:5] if len(code) >= 5 else "",
+        )
+
+    # Field extraction A-G
+    fields: dict[str, str] = {}
+    for fm in _FIELD_RE.finditer(raw):
+        fields[fm.group("field")] = fm.group("value").strip()
+
+    # A) Location
+    location = fields.get("A", "").strip()
+    if not location:
+        raise NOTAMParseError("Missing A) field (location) in NOTAM")
+
+    # B) Effective from
+    b_raw = fields.get("B", "")
+    effective_from = _parse_notam_dt(b_raw, now.year) if b_raw else None
+
+    # C) Effective to
+    c_raw = fields.get("C", "").upper()
+    permanent = False
+    estimated = False
+    effective_to: Optional[datetime] = None
+    if c_raw:
+        if "PERM" in c_raw:
+            permanent = True
+        elif "UFN" in c_raw or c_raw == "":
+            effective_to = None
+        else:
+            if c_raw.endswith("EST"):
+                estimated = True
+                c_raw = c_raw[:-3].strip()
+            effective_to = _parse_notam_dt(c_raw, now.year)
+
+    # D) Schedule
+    schedule = fields.get("D", None)
+
+    # E) Plain-language text
+    text = fields.get("E", "")
+
+    # F) Lower limit
+    lower_limit = fields.get("F", None)
+
+    # G) Upper limit
+    upper_limit = fields.get("G", None)
+
+    # Extract runway and taxiway IDs from E text
+    affected_runways = list({m.group("id") for m in _RWY_RE.finditer(text)})
+    affected_taxiways = list({m.group("id") for m in _TWY_RE.finditer(text)})
+
+    return NOTAMObservation(
+        raw=raw,
+        series=series,
+        number=number,
+        notam_type=notam_type,
+        q_line=q_line,
+        location=location,
+        effective_from=effective_from,
+        effective_to=effective_to,
+        permanent=permanent,
+        estimated=estimated,
+        schedule=schedule,
+        text=text,
+        lower_limit=lower_limit,
+        upper_limit=upper_limit,
+        affected_runways=sorted(affected_runways),
+        affected_taxiways=sorted(affected_taxiways),
+    )
