@@ -1,0 +1,607 @@
+# Aviation Safety Taxonomy for AeroSafetyEval
+# Covers the 9 branches defined in proposal §9.1
+# Each branch maps to a task family in proposal §7.
+# This file is the authoritative taxonomy used by the data curation pipeline.
+#
+# Structure:
+#   branch_id: int (1–9)
+#   name: str
+#   description: str
+#   task_family: str (maps to proposal §7 family label)
+#   subtopics: list of subtopic dicts
+#     subtopic_id: str (branch_id.index)
+#     name: str
+#     key_rules_and_concepts: list[str]  (regulatory basis, not invented content)
+#     knowledge_point_seeds: list[str]   (types of KPs to extract from authoritative corpora)
+#     critical_failure_modes: list[str]  (from proposal §7 and §14)
+
+schema_version: "1.0.0"
+created: "2026-05-17"
+author: "data-curator"
+governed_by: "CLAUDE.md §2, proposal §9.1"
+
+branches:
+
+  - branch_id: 1
+    name: "Flight Operations"
+    description: >
+      Covers pilot decision-making, operational limits, flight phase transitions,
+      and safety-of-flight constraints in normal and abnormal operations.
+    task_family: "Task Family 1 — Aviation Safety Report Intelligence"
+    subtopics:
+
+      - subtopic_id: "1.1"
+        name: "Safety Report Classification"
+        key_rules_and_concepts:
+          - "ASRS voluntary reporting system definitions (NASA)"
+          - "Event type taxonomy (airprox, runway incursion, airspace deviation, etc.)"
+          - "Flight phase taxonomy (taxi, takeoff, en-route, approach, landing)"
+        knowledge_point_seeds:
+          - "Event type classification from ASRS narrative"
+          - "Flight phase identification from ASRS narrative"
+          - "Contributing factor extraction"
+        critical_failure_modes:
+          - "Misclassifying event severity"
+          - "Confusing direct cause with contributing factor"
+          - "Missing latent organizational factors"
+
+      - subtopic_id: "1.2"
+        name: "Causal Chain Reconstruction"
+        key_rules_and_concepts:
+          - "SHELL model (Software, Hardware, Environment, Liveware)"
+          - "Swiss cheese accident model (Reason, 1990)"
+          - "ICAO Doc 9859 Safety Management Manual"
+        knowledge_point_seeds:
+          - "Causal chain reconstruction from incident narrative"
+          - "Contributing factor vs direct cause distinction"
+          - "Human factor categorization"
+        critical_failure_modes:
+          - "Confusing correlation with causation"
+          - "Unsupported mitigation recommendations"
+          - "Hallucinated causal links not in source text"
+
+      - subtopic_id: "1.3"
+        name: "Risk Severity Classification"
+        key_rules_and_concepts:
+          - "ICAO risk matrix (severity × probability)"
+          - "CAST/ICAO Common Taxonomy Team (CICTT) occurrence categories"
+          - "SMS hazard severity definitions"
+        knowledge_point_seeds:
+          - "Risk severity classification from scenario description"
+          - "Hazard identification in operational context"
+        critical_failure_modes:
+          - "Under-rating severity of near-miss events"
+          - "Over-rating non-safety events"
+
+      - subtopic_id: "1.4"
+        name: "Mitigation Recommendation Quality"
+        key_rules_and_concepts:
+          - "ICAO SMS corrective action framework"
+          - "FAA SMS Advisory Circular AC 120-92B"
+        knowledge_point_seeds:
+          - "Feasibility of proposed mitigation"
+          - "Evidence support for recommendation"
+          - "Unsupported recommendation detection"
+        critical_failure_modes:
+          - "Unsupported recommendation from agent"
+          - "Recommending actions beyond organizational authority"
+
+  - branch_id: 2
+    name: "Accident Causation"
+    description: >
+      Covers NTSB accident investigation methodology, probable cause analysis,
+      contributing factor classification, and prevention recommendations.
+    task_family: "Task Family 2 — Accident and Incident Analysis"
+    subtopics:
+
+      - subtopic_id: "2.1"
+        name: "Probable Cause Identification"
+        key_rules_and_concepts:
+          - "NTSB probable cause definition (49 CFR 831.2)"
+          - "NTSB accident report structure and fields"
+          - "ICAO Annex 13 accident investigation standards"
+        knowledge_point_seeds:
+          - "Probable cause extraction from NTSB report"
+          - "Contributing factor classification"
+          - "Human factors categorization (FAA AC 60-22)"
+        critical_failure_modes:
+          - "Confusing probable cause with contributing factor"
+          - "Presenting speculation as NTSB finding"
+          - "Missing multi-causal structure"
+
+      - subtopic_id: "2.2"
+        name: "Human Factor Analysis"
+        key_rules_and_concepts:
+          - "HFACS (Human Factors Analysis and Classification System)"
+          - "CRM failure modes (crew resource management)"
+          - "Automation complacency and mode confusion"
+        knowledge_point_seeds:
+          - "Human factor category identification"
+          - "CRM failure detection"
+          - "Automation factor identification"
+        critical_failure_modes:
+          - "Blaming individual without systemic context"
+          - "Missing organizational contributing factors"
+
+      - subtopic_id: "2.3"
+        name: "Accident Sequence Reconstruction"
+        key_rules_and_concepts:
+          - "NTSB factual report timeline fields"
+          - "Event sequence notation standards"
+        knowledge_point_seeds:
+          - "Accident sequence timeline reconstruction"
+          - "Decision point identification"
+          - "Intervention opportunity identification"
+        critical_failure_modes:
+          - "Sequence ordering errors"
+          - "Adding events not in the report"
+
+      - subtopic_id: "2.4"
+        name: "Maintenance-Related Factors"
+        key_rules_and_concepts:
+          - "FAA Advisory Circular AC 43-16A (maintenance error)"
+          - "NTSB maintenance factor categorization"
+          - "M-SHELL model for maintenance human factors"
+        knowledge_point_seeds:
+          - "Maintenance factor identification from report"
+          - "Return-to-service error classification"
+        critical_failure_modes:
+          - "Overlooking latent maintenance defects"
+          - "Confusing maintenance error type"
+
+  - branch_id: 3
+    name: "Dispatch and Weather"
+    description: >
+      Covers METAR/TAF interpretation, weather minima, alternate requirements,
+      crosswind/tailwind limits, and dispatch go/no-go decisions.
+    task_family: "Task Family 3 — Weather and Dispatch Risk"
+    subtopics:
+
+      - subtopic_id: "3.1"
+        name: "METAR Decoding and Interpretation"
+        key_rules_and_concepts:
+          - "ICAO Annex 3 — Meteorological Service for International Air Navigation"
+          - "FAA Order 7110.10 (Flight Services)"
+          - "WMO No. 49 (Technical Regulations)"
+          - "METAR format: station, time, wind, visibility, weather, sky condition, temperature, altimeter"
+        knowledge_point_seeds:
+          - "Wind direction and speed extraction"
+          - "Gust identification and significance"
+          - "Visibility and RVR interpretation"
+          - "Ceiling vs sky condition distinction"
+          - "Present weather code interpretation (RA, SN, FG, TS, etc.)"
+        critical_failure_modes:
+          - "Ignoring gust component in crosswind calculation"
+          - "Confusing ceiling with visibility"
+          - "Misreading variable wind direction"
+          - "Misinterpreting CAVOK conditions"
+
+      - subtopic_id: "3.2"
+        name: "TAF Interpretation and Time Windows"
+        key_rules_and_concepts:
+          - "ICAO Annex 3 TAF format and validity period"
+          - "TEMPO, BECMG, PROB change indicators"
+          - "TAF validity period interpretation"
+        knowledge_point_seeds:
+          - "TAF validity period judgment"
+          - "Probability group interpretation (PROB30, PROB40)"
+          - "TEMPO vs BECMG applicability"
+          - "Forecast deterioration window identification"
+        critical_failure_modes:
+          - "Misreading TAF valid time as local vs UTC"
+          - "Treating PROB30 as certain"
+          - "Missing TEMPO weather deterioration"
+
+      - subtopic_id: "3.3"
+        name: "Wind Component Calculation"
+        key_rules_and_concepts:
+          - "Crosswind component = wind_speed × sin(angle between wind and runway)"
+          - "Tailwind component = wind_speed × cos(angle) when behind"
+          - "FAA crosswind limit enforcement (AFM/POH)"
+          - "Demonstrated crosswind vs maximum crosswind limit"
+        knowledge_point_seeds:
+          - "Crosswind component calculation"
+          - "Tailwind component calculation"
+          - "Gust-adjusted crosswind calculation"
+          - "Crosswind limit applicability"
+        critical_failure_modes:
+          - "Using mean wind speed without gust"
+          - "Wrong angle reference (magnetic vs true)"
+          - "Swapping crosswind and headwind components"
+
+      - subtopic_id: "3.4"
+        name: "Alternate Airport and IFR Minima"
+        key_rules_and_concepts:
+          - "FAA 14 CFR Part 91.169 (alternate airport requirements)"
+          - "FAA 14 CFR Part 121.625 (Part 121 alternate minima)"
+          - "1-2-3 rule for alternate filing"
+          - "Standard alternate minima: 600-2 (precision) / 800-2 (non-precision)"
+        knowledge_point_seeds:
+          - "Alternate requirement determination"
+          - "IFR alternate minima check"
+          - "1-2-3 rule application"
+        critical_failure_modes:
+          - "Applying wrong regulatory part (91 vs 121 vs 135)"
+          - "Ignoring non-standard alternate minima"
+
+      - subtopic_id: "3.5"
+        name: "Dispatch Decision under Weather Constraints"
+        key_rules_and_concepts:
+          - "FAA 14 CFR Part 121 Subpart U (dispatching rules)"
+          - "ICAO Doc 9976 (Flight Planning and Fuel Management)"
+          - "Low visibility operations requirements"
+        knowledge_point_seeds:
+          - "Go/delay/divert/cancel recommendation from weather scenario"
+          - "Weather minima compliance check"
+          - "Fuel reserve calculation basis"
+        critical_failure_modes:
+          - "Unsafe proceed recommendation below minima"
+          - "Ignoring deteriorating forecast window"
+          - "Missing alternate fuel requirement"
+
+  - branch_id: 4
+    name: "NOTAM and Operational Compliance"
+    description: >
+      Covers NOTAM parsing, effective time/validity, runway/taxiway closure detection,
+      spatial applicability, and flight operation compliance judgments.
+    task_family: "Task Family 4 — NOTAM and Operational Compliance"
+    subtopics:
+
+      - subtopic_id: "4.1"
+        name: "NOTAM Format and Parsing"
+        key_rules_and_concepts:
+          - "ICAO Annex 15 — Aeronautical Information Services"
+          - "FAA NOTAM format (NOTAM D, NOTAM FDC, TFR NOTAMs)"
+          - "NOTAM fields: Q-code, location, effective time, schedule, text"
+          - "ICAO NOTAM Q-code categorization"
+        knowledge_point_seeds:
+          - "NOTAM type classification"
+          - "Effective time extraction and UTC validation"
+          - "Q-code subject/condition interpretation"
+          - "Runway/taxiway identifier extraction"
+        critical_failure_modes:
+          - "UTC vs local time confusion in effective time"
+          - "Misidentifying runway vs taxiway designator"
+          - "Missing 'C' (closed) vs 'U' (unserviceable) distinction"
+
+      - subtopic_id: "4.2"
+        name: "Temporal Validity Judgment"
+        key_rules_and_concepts:
+          - "NOTAM effective from/to fields (YYMMDD/HHMM UTC)"
+          - "PERM (permanent) NOTAM handling"
+          - "Schedule group (D) interpretation (e.g., MON-FRI 0800-1700)"
+        knowledge_point_seeds:
+          - "NOTAM active at given departure time"
+          - "Schedule group applicability"
+          - "PERM NOTAM handling"
+        critical_failure_modes:
+          - "Treating expired NOTAM as active"
+          - "Ignoring schedule restrictions (D group)"
+          - "Wrong UTC offset application"
+
+      - subtopic_id: "4.3"
+        name: "Spatial and Operational Applicability"
+        key_rules_and_concepts:
+          - "Airport ICAO identifier applicability"
+          - "Runway designator specificity (09L vs 09R)"
+          - "TFR radius and altitude applicability"
+          - "Approach aid vs runway closure distinction"
+        knowledge_point_seeds:
+          - "Runway-specific applicability judgment"
+          - "Airspace restriction boundary check"
+          - "ILS vs runway closure distinction"
+        critical_failure_modes:
+          - "Applying runway-specific NOTAM to wrong runway"
+          - "Misinterpreting ILS NOTAM as runway closure"
+          - "Wrong TFR boundary application"
+
+      - subtopic_id: "4.4"
+        name: "Advisory vs Mandatory Classification"
+        key_rules_and_concepts:
+          - "FAA NOTAM mandatory vs advisory language"
+          - "TFR mandatory restrictions (14 CFR 91.137–91.145)"
+          - "Recommended vs required procedures distinction"
+        knowledge_point_seeds:
+          - "Mandatory vs advisory determination"
+          - "TFR regulatory basis identification"
+        critical_failure_modes:
+          - "Treating advisory NOTAM as mandatory"
+          - "Treating mandatory TFR as advisory"
+
+      - subtopic_id: "4.5"
+        name: "Go/No-Go Compliance Judgment"
+        key_rules_and_concepts:
+          - "Combined NOTAM + weather + MEL compliance check"
+          - "Dispatch release constraints"
+        knowledge_point_seeds:
+          - "Go/no-go recommendation under active NOTAM"
+          - "Multi-NOTAM conflict detection"
+        critical_failure_modes:
+          - "Missing active closure NOTAM in go decision"
+          - "Ignoring stacked NOTAM restrictions"
+
+  - branch_id: 5
+    name: "Airport Surface Operations"
+    description: >
+      Covers airport diagram interpretation, runway incursion risk, taxi route
+      conflict detection, hold-short compliance, and surface movement sequencing.
+    task_family: "Task Family 5 — Airport Surface Operations"
+    subtopics:
+
+      - subtopic_id: "5.1"
+        name: "Runway Incursion Classification"
+        key_rules_and_concepts:
+          - "FAA runway incursion severity categories A–D"
+          - "ICAO Doc 9870 — Prevention of Runway Incursions"
+          - "Hot spot designation and management"
+        knowledge_point_seeds:
+          - "Runway incursion category determination"
+          - "Hot spot risk identification"
+          - "Incursion contributing factor identification"
+        critical_failure_modes:
+          - "Missing simultaneous runway occupancy"
+          - "Under-rating incursion severity"
+
+      - subtopic_id: "5.2"
+        name: "Taxi Route and Conflict Detection"
+        key_rules_and_concepts:
+          - "FAA runway crossing clearance requirements (14 CFR 91.129)"
+          - "Hold-short instruction compliance"
+          - "Intersection taxi authorization"
+        knowledge_point_seeds:
+          - "Taxi route conflict identification"
+          - "Runway crossing conflict detection"
+          - "Aircraft-vehicle conflict detection on surface"
+        critical_failure_modes:
+          - "Ignoring hold-short instruction"
+          - "Missing runway crossing conflict"
+          - "Wrong taxiway designation interpretation"
+
+      - subtopic_id: "5.3"
+        name: "Surface Movement Sequencing"
+        key_rules_and_concepts:
+          - "Ground controller sequencing procedures"
+          - "Pushback conflict management"
+          - "Runway occupancy time optimization"
+        knowledge_point_seeds:
+          - "Surface movement sequence conflict identification"
+          - "Gate pushback conflict detection"
+        critical_failure_modes:
+          - "Unsafe simultaneous runway occupancy recommendation"
+          - "Missing pushback conflict"
+
+  - branch_id: 6
+    name: "Air Traffic Management"
+    description: >
+      Covers ATC separation standards, ADS-B trajectory analysis, conflict detection,
+      airspace coordination, and resolution advisory assessment.
+    task_family: "Task Family 6 — Air Traffic Separation and Conflict Detection"
+    subtopics:
+
+      - subtopic_id: "6.1"
+        name: "Separation Minima"
+        key_rules_and_concepts:
+          - "ICAO Doc 4444 PANS-ATM — horizontal separation (5 NM en-route)"
+          - "ICAO Doc 4444 — vertical separation (1000 ft below FL290, 2000 ft above)"
+          - "RVSM (Reduced Vertical Separation Minimum) 1000 ft above FL290"
+          - "Terminal area separation (3 NM radar)"
+        knowledge_point_seeds:
+          - "Horizontal separation check from trajectory data"
+          - "Vertical separation check"
+          - "Loss-of-separation detection"
+        critical_failure_modes:
+          - "Unit conversion error (NM vs km)"
+          - "Ignoring RVSM applicability"
+          - "Confusing en-route and terminal minima"
+
+      - subtopic_id: "6.2"
+        name: "Conflict Detection and Prediction"
+        key_rules_and_concepts:
+          - "ADS-B position accuracy requirements (ICAO Annex 10)"
+          - "TCAS/ACAS resolution advisory logic"
+          - "Time-to-conflict estimation methodology"
+        knowledge_point_seeds:
+          - "Future conflict prediction from trajectory"
+          - "Time-to-conflict calculation"
+          - "TCAS RA interpretation"
+        critical_failure_modes:
+          - "Failing to detect future conflict from current tracks"
+          - "Ignoring altitude convergence rate"
+          - "Misinterpreting RA as ATC instruction"
+
+      - subtopic_id: "6.3"
+        name: "Resolution Assessment"
+        key_rules_and_concepts:
+          - "ATC conflict resolution vectoring procedures"
+          - "Pilot TCAS RA compliance requirement"
+          - "ICAO Doc 4444 conflict resolution phraseology"
+        knowledge_point_seeds:
+          - "Resolution recommendation evaluation"
+          - "RA compliance vs ATC instruction conflict handling"
+        critical_failure_modes:
+          - "Recommending unsafe resolution vector"
+          - "Ignoring traffic geometry in resolution"
+
+  - branch_id: 7
+    name: "Wake Vortex and Separation Safety"
+    description: >
+      Covers aircraft wake turbulence categories, static and dynamic separation minima,
+      wind effects on wake persistence, and LiDAR-based wake detection.
+    task_family: "Task Family 7 — Wake Vortex and Separation Safety"
+    subtopics:
+
+      - subtopic_id: "7.1"
+        name: "Wake Category Classification"
+        key_rules_and_concepts:
+          - "FAA wake turbulence categories: Super Heavy, Heavy, B757, Large, Small"
+          - "ICAO wake turbulence categories: Super (J), Heavy (H), Medium (M), Light (L)"
+          - "RECAT-US FAA categories A–F"
+          - "RECAT-EU (Phase 1) categories"
+        knowledge_point_seeds:
+          - "Aircraft type to wake category mapping"
+          - "ICAO vs FAA category comparison"
+          - "RECAT category identification"
+        critical_failure_modes:
+          - "Wrong wake category assignment"
+          - "Ignoring 'Super' category for A380/An-225"
+
+      - subtopic_id: "7.2"
+        name: "Separation Minima Application"
+        key_rules_and_concepts:
+          - "FAA wake turbulence separation: 7–4 NM leading/following heavy pairs"
+          - "ICAO Doc 4444 Appendix — wake turbulence separation table"
+          - "Runway wake separation time-based minima"
+          - "Same-runway, crossing-runway, parallel-runway scenarios"
+        knowledge_point_seeds:
+          - "Required separation minima from leader/follower pair"
+          - "Time-based vs distance-based separation selection"
+          - "Runway configuration effect on wake separation"
+        critical_failure_modes:
+          - "Applying wrong separation from table (leading vs following error)"
+          - "Ignoring super-category row"
+          - "Confusing distance-based and time-based minima"
+
+      - subtopic_id: "7.3"
+        name: "Wind Effect and Wake Persistence"
+        key_rules_and_concepts:
+          - "Crosswind effect on wake drift"
+          - "Headwind effect on wake decay"
+          - "Tailwind effect on wake persistence on approach"
+          - "Ground effect wake behavior"
+        knowledge_point_seeds:
+          - "Wind effect on wake hazard zone"
+          - "Wake persistence duration estimation"
+          - "Safe vs unsafe wake scenario identification"
+        critical_failure_modes:
+          - "Ignoring crosswind drift direction"
+          - "Underestimating tailwind wake persistence"
+
+      - subtopic_id: "7.4"
+        name: "LiDAR Wake Detection Interpretation"
+        key_rules_and_concepts:
+          - "LiDAR wake vortex detection output format"
+          - "Vortex pair circulation strength (Gamma, m²/s)"
+          - "Safe Gamma threshold interpretation"
+        knowledge_point_seeds:
+          - "LiDAR output interpretation for wake clearance"
+          - "Vortex strength decay assessment"
+        critical_failure_modes:
+          - "Misreading vortex circulation as safe when above threshold"
+          - "Wrong axis interpretation on LiDAR plot"
+
+  - branch_id: 8
+    name: "Maintenance Release"
+    description: >
+      Covers MEL/CDL rules, dispatch eligibility, maintenance restriction identification,
+      operational limitations, and safe release recommendations.
+    task_family: "Task Family 8 — Maintenance and Operational Reliability"
+    subtopics:
+
+      - subtopic_id: "8.1"
+        name: "MEL Dispatch Eligibility"
+        key_rules_and_concepts:
+          - "FAA 14 CFR Part 91.213 — inoperative instruments and equipment"
+          - "FAA 14 CFR Part 121.628 — MEL authority"
+          - "MMEL (Master Minimum Equipment List) structure"
+          - "MEL categories: A (no limit), B (3 days), C (10 days), D (120 days)"
+          - "Dispatch conditions (O-item, M-item)"
+        knowledge_point_seeds:
+          - "MEL category determination from discrepancy"
+          - "Dispatch allowed/not-allowed decision"
+          - "O-item and M-item requirement identification"
+          - "Repair interval compliance check"
+        critical_failure_modes:
+          - "Recommending dispatch when MEL prohibits"
+          - "Ignoring category interval expiry"
+          - "Missing required O-item or M-item condition"
+
+      - subtopic_id: "8.2"
+        name: "Operational Limitation Assessment"
+        key_rules_and_concepts:
+          - "Performance impact of MEL items"
+          - "ETOPS restriction under MEL"
+          - "Operational restriction (e.g., no CAT II/III with MEL item)"
+        knowledge_point_seeds:
+          - "Operational limitation identification"
+          - "Route restriction from MEL item"
+          - "ETOPS eligibility with inoperative system"
+        critical_failure_modes:
+          - "Missing operational restriction from MEL item"
+          - "Approving ETOPS when not eligible"
+
+      - subtopic_id: "8.3"
+        name: "Repeat Defect and Reliability Risk"
+        key_rules_and_concepts:
+          - "FAA AC 120-16G — continuous airworthiness maintenance programs"
+          - "Reliability program repeat fault triggers"
+          - "SDR (Service Difficulty Report) repeat patterns"
+        knowledge_point_seeds:
+          - "Repeat defect pattern identification"
+          - "Systemic failure risk recognition"
+        critical_failure_modes:
+          - "Treating isolated fault as isolated when pattern exists"
+          - "Missing repeat write-up history"
+
+  - branch_id: 9
+    name: "Optimization-Integrated Operations"
+    description: >
+      Covers runway sequencing, gate assignment, arrival/departure balancing,
+      ground delay programs, and corridor allocation under safety constraints.
+    task_family: "Task Family 9 — Optimization-Integrated Aviation Decisions"
+    subtopics:
+
+      - subtopic_id: "9.1"
+        name: "Runway Sequencing"
+        key_rules_and_concepts:
+          - "Runway capacity and throughput optimization"
+          - "Wake-constrained scheduling (FCFS vs reordering)"
+          - "Arrival sequencing with TRACON constraints"
+        knowledge_point_seeds:
+          - "Sequencing feasibility check under wake separation"
+          - "Makespan and throughput calculation"
+          - "Safety constraint enforcement in sequence"
+        critical_failure_modes:
+          - "Generating infeasible wake separation in sequence"
+          - "Optimizing throughput while violating safety"
+
+      - subtopic_id: "9.2"
+        name: "Gate Assignment"
+        key_rules_and_concepts:
+          - "Aircraft type vs gate compatibility"
+          - "Pushback conflict constraints"
+          - "Gate capacity and turn-time constraints"
+        knowledge_point_seeds:
+          - "Gate feasibility check"
+          - "Conflict-free assignment verification"
+        critical_failure_modes:
+          - "Assigning incompatible aircraft type to gate"
+          - "Missing pushback conflict in assignment"
+
+      - subtopic_id: "9.3"
+        name: "Ground Delay Program (GDP)"
+        key_rules_and_concepts:
+          - "FAA ATCSCC GDP procedures"
+          - "EDCT (Expect Departure Clearance Time) allocation"
+          - "GDP exemption rules"
+        knowledge_point_seeds:
+          - "GDP EDCT allocation fairness"
+          - "Exempt flight identification"
+          - "Departure slot optimization"
+        critical_failure_modes:
+          - "Ignoring GDP exemption categories"
+          - "Generating EDCT conflicts"
+
+      - subtopic_id: "9.4"
+        name: "Solver Integrity and Constraint Fidelity"
+        key_rules_and_concepts:
+          - "LP/MIP feasibility vs infeasibility interpretation"
+          - "Safety constraint as hard constraint enforcement"
+          - "Objective function vs safety constraint priority"
+        knowledge_point_seeds:
+          - "Infeasible model identification"
+          - "Solver output interpretation correctness"
+          - "Safety constraint omission detection"
+        critical_failure_modes:
+          - "Treating infeasible model output as valid"
+          - "Relaxing safety constraints to achieve feasibility"
+          - "Misinterpreting solver status codes"

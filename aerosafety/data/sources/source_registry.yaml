@@ -1,0 +1,627 @@
+# AeroSafetyEval — Authoritative Data Source Registry
+#
+# Governed by CLAUDE.md §2.1 (Authoritative Sources Only).
+# Every source must include: official URL, license, access method,
+# expected format, citation, last-verified date, and requires_user_action flag.
+#
+# Fields:
+#   source_id: str
+#   name: str
+#   organization: str
+#   official_url: str
+#   license: str
+#   commercial_use_ok: bool | "unknown"  — whether license permits commercial research use
+#   access_method: "direct_download" | "api" | "manual_request" | "web_scrape_permitted"
+#   requires_user_action: bool           — True if user must register, request key, or sign agreement
+#   user_action_description: str | null  — what action is required
+#   expected_format: list[str]           — file formats to expect
+#   estimated_volume: str                — rough order-of-magnitude estimate
+#   task_families: list[int]             — which task families (1–9) this source feeds
+#   citation: str                        — standard citation text
+#   last_verified: str                   — YYYY-MM-DD, date URL/license was last checked
+#   notes: str                           — any special constraints or caveats
+#   enabled: bool                        — set to false until team-lead green-lights download
+
+schema_version: "1.0.0"
+created: "2026-05-17"
+author: "data-curator"
+governed_by: "CLAUDE.md §2.1, proposal §9.2"
+
+sources:
+
+  # ── 1. NASA ASRS ──────────────────────────────────────────────────────────
+  - source_id: "NASA_ASRS"
+    name: "Aviation Safety Reporting System (ASRS) Database"
+    organization: "NASA Ames Research Center / FAA"
+    official_url: "https://asrs.arc.nasa.gov/search/database.html"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+      De-identified voluntarily submitted safety reports.
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "txt"
+      - "csv"
+    estimated_volume: "~1.5 million reports total; ~60,000–80,000 added per year"
+    task_families: [1, 2]
+    citation: >
+      NASA Aviation Safety Reporting System (ASRS).
+      National Aeronautics and Space Administration, Ames Research Center.
+      Available at: https://asrs.arc.nasa.gov
+    last_verified: "2026-05-17"
+    notes: >
+      Reports are de-identified; no personally identifiable information.
+      Download via the ASRS database search (bulk download available in CSV).
+      Narratives may contain reporter-supplied information not independently verified.
+      Mark all ASRS-derived records with source_type=ASRS_VOLUNTARY_REPORT.
+    enabled: false
+
+  # ── 2. NTSB Aviation Accident Database ────────────────────────────────────
+  - source_id: "NTSB_ACCIDENT_DB"
+    name: "NTSB Aviation Accident and Incident Data System (CADREP/AIDES)"
+    organization: "National Transportation Safety Board"
+    official_url: "https://www.ntsb.gov/Pages/AviationQueryV2.aspx"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "xml"
+      - "csv"
+      - "txt"
+    estimated_volume: >
+      ~80,000+ accident/incident records (dating to 1962);
+      full narrative reports available for major accidents.
+    task_families: [2]
+    citation: >
+      National Transportation Safety Board (NTSB).
+      Aviation Accident Database and Synopses.
+      Available at: https://www.ntsb.gov/Pages/AviationQueryV2.aspx
+    last_verified: "2026-05-17"
+    notes: >
+      Structured data (CSV) available for bulk download.
+      Full probable cause narrative reports available as individual txt/PDF pages.
+      Use structured CSV fields (event_type, phase_of_flight, probable_cause_text)
+      as primary extraction targets. Do not infer probable cause beyond what NTSB states.
+    enabled: false
+
+  # ── 3. NTSB Full Accident Reports (PDF) ───────────────────────────────────
+  - source_id: "NTSB_FULL_REPORTS"
+    name: "NTSB Full Accident Investigation Reports"
+    organization: "National Transportation Safety Board"
+    official_url: "https://www.ntsb.gov/investigations/Pages/aviation.aspx"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+      - "html"
+    estimated_volume: "~1,000–2,000 major accident reports with full narrative"
+    task_families: [2]
+    citation: >
+      National Transportation Safety Board (NTSB).
+      Accident Investigation Reports.
+      Available at: https://www.ntsb.gov/investigations/Pages/aviation.aspx
+    last_verified: "2026-05-17"
+    notes: >
+      Full reports provide richer narrative for causal chain reconstruction.
+      PDF parsing required; preserve original structure.
+      Limit to reports with structured probable cause sections.
+    enabled: false
+
+  # ── 4. FAA Aviation Safety Hotline / Service Difficulty Reporting ─────────
+  - source_id: "FAA_SDR"
+    name: "FAA Service Difficulty Reporting (SDR) Database"
+    organization: "Federal Aviation Administration"
+    official_url: "https://av-info.faa.gov/sdrx/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "csv"
+      - "xml"
+    estimated_volume: "~200,000+ records"
+    task_families: [8]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Service Difficulty Reporting (SDR) System.
+      Available at: https://av-info.faa.gov/sdrx/
+    last_verified: "2026-05-17"
+    notes: >
+      SDR records describe maintenance discrepancies reported by certificate holders.
+      Useful for Task Family 8 (maintenance release) KP extraction.
+      Fields include aircraft make/model, ATA chapter, difficulty description, remedy.
+    enabled: false
+
+  # ── 5. NOAA METAR Archive ──────────────────────────────────────────────────
+  - source_id: "NOAA_METAR"
+    name: "NOAA Iowa Environmental Mesonet (IEM) METAR Archive"
+    organization: "Iowa State University / NOAA"
+    official_url: "https://mesonet.agron.iastate.edu/request/download.phtml"
+    license: >
+      Public domain; data originates from NOAA/NWS public feeds.
+      IEM access terms: https://mesonet.agron.iastate.edu/info/tos.phtml
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "csv"
+      - "json"
+    estimated_volume: "Hundreds of millions of METAR observations globally; select by station and date range"
+    task_families: [3]
+    citation: >
+      Iowa Environmental Mesonet (IEM), Iowa State University.
+      ASOS-METAR Archive.
+      Available at: https://mesonet.agron.iastate.edu/request/download.phtml
+      Data sourced from NOAA/NWS.
+    last_verified: "2026-05-17"
+    notes: >
+      Rate limit: documented at https://mesonet.agron.iastate.edu/info/tos.phtml
+      Use the IEM ASOS download service with station + date range filters.
+      Select specific high-traffic airports (KLAX, KJFK, KORD, KATL, EGLL, RJTT).
+      Do not bulk-download all stations without team-lead approval.
+      Store raw METAR strings with station_id + observation_timestamp.
+    enabled: false
+
+  # ── 6. NOAA Aviation Weather Center TAF ───────────────────────────────────
+  - source_id: "NOAA_TAF"
+    name: "NOAA Aviation Weather Center — TAF Archive"
+    organization: "NOAA / National Weather Service"
+    official_url: "https://aviationweather.gov/data/api/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "json"
+      - "xml"
+      - "text"
+    estimated_volume: "TAF updated 4× daily per station; historical archive via API query"
+    task_families: [3]
+    citation: >
+      NOAA Aviation Weather Center (AWC).
+      Terminal Aerodrome Forecast (TAF) Data API.
+      Available at: https://aviationweather.gov/data/api/
+    last_verified: "2026-05-17"
+    notes: >
+      Use the AWC Data API (https://aviationweather.gov/data/api/) with TAF endpoint.
+      Respect documented request rate limits.
+      Pair with METAR records for same station and time window for Task Family 3.
+    enabled: false
+
+  # ── 7. FAA NOTAM System ────────────────────────────────────────────────────
+  - source_id: "FAA_NOTAM"
+    name: "FAA NOTAM Search (NOTAM Management System)"
+    organization: "Federal Aviation Administration"
+    official_url: "https://notams.aim.faa.gov/notamSearch/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "api"
+    requires_user_action: true
+    user_action_description: >
+      FAA provides a NOTAM API (https://api.faa.gov/notamapi/). Requires free API key
+      registration at https://api.faa.gov. Account creation required (no cost).
+    expected_format:
+      - "json"
+    estimated_volume: "Millions of NOTAMs; filter by airport ICAO code and date range"
+    task_families: [4]
+    citation: >
+      Federal Aviation Administration (FAA).
+      NOTAM Management System / NOTAM Search.
+      Available at: https://notams.aim.faa.gov/notamSearch/
+      API: https://api.faa.gov/notamapi/
+    last_verified: "2026-05-17"
+    notes: >
+      The FAA NOTAM API (api.faa.gov) provides programmatic access to current and
+      archived NOTAMs. Rate limits and terms: https://api.faa.gov/terms-and-conditions
+      For historical NOTAM snapshots, supplement with ICAO AIS portals (see ICAO_NOTAM source).
+      Log every API call with request parameters, timestamp, and response code.
+    enabled: false
+
+  # ── 8. ICAO AIS — International NOTAM data ────────────────────────────────
+  - source_id: "ICAO_NOTAM"
+    name: "ICAO NOTAM / AIS Data (ICAO SWIM / International NOTAMs)"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://www.icao.int/safety/information-management/Pages/SWIM.aspx"
+    license: >
+      ICAO data use is governed by ICAO's data policy.
+      Some NOTAM data accessible via bilateral AIS agreements or national AIS portals.
+      Consult ICAO Doc 8585 and national AIS authority for specific license terms.
+    commercial_use_ok: "unknown"
+    access_method: "manual_request"
+    requires_user_action: true
+    user_action_description: >
+      International NOTAM data (ICAO SWIM) requires coordination with national AIS
+      authorities. For research purposes, contact individual national AIS providers
+      (e.g., UK NATS, Eurocontrol B2B services). Eurocontrol B2B requires network
+      membership: https://www.eurocontrol.int/service/network-manager-business-business-b2b-web-services
+    expected_format:
+      - "AIXM 5.1"
+      - "json"
+      - "NOTAM plain text"
+    estimated_volume: "Varies by region and time range"
+    task_families: [4]
+    citation: >
+      International Civil Aviation Organization (ICAO).
+      Aeronautical Information Services (AIS) / SWIM.
+      Available at: https://www.icao.int/safety/information-management/Pages/SWIM.aspx
+    last_verified: "2026-05-17"
+    notes: >
+      Use FAA_NOTAM source primarily for U.S. operations.
+      For international coverage, use this source with appropriate institutional access.
+      Mark all ICAO NOTAM data with originating AIS authority.
+    enabled: false
+
+  # ── 9. OpenSky Network — ADS-B Trajectories ───────────────────────────────
+  - source_id: "OPENSKY_ADSB"
+    name: "OpenSky Network — Historical ADS-B Data"
+    organization: "OpenSky Network (open-source research consortium)"
+    official_url: "https://opensky-network.org/data/impala"
+    license: >
+      OpenSky Network Data License Agreement.
+      Academic / research use permitted without charge.
+      Commercial use requires separate agreement.
+      Full terms: https://opensky-network.org/about/terms-of-use
+    commercial_use_ok: false
+    access_method: "api"
+    requires_user_action: true
+    user_action_description: >
+      Requires free registration at https://opensky-network.org/register.
+      Impala cluster access for historical data requires additional request via
+      https://opensky-network.org/data/impala (academic credential may be required).
+    expected_format:
+      - "parquet"
+      - "csv"
+    estimated_volume: "Billions of ADS-B state vectors; filter by airport/ICAO + date range"
+    task_families: [6]
+    citation: >
+      Matthias Schäfer, Martin Strohmeier, Vincent Lenders, Ivan Martinovic, Matthias Wilhelm.
+      Bringing Up OpenSky: A Large-scale ADS-B Sensor Network for Research.
+      IPSN-14, April 2014.
+      Available at: https://opensky-network.org
+    last_verified: "2026-05-17"
+    notes: >
+      Use traffic library (https://traffic-viz.github.io/) for trajectory processing.
+      Restrict to terminal area trajectories (within ~50 NM of selected airports).
+      ADS-B data quality varies; flag records with low message rate or position anomalies.
+      ADSB-derived positions are not certified navigation data.
+    enabled: false
+
+  # ── 10. EUROCONTROL PRISME / DDS ──────────────────────────────────────────
+  - source_id: "EUROCONTROL_DDS"
+    name: "EUROCONTROL Data Demand Service (DDS) / Network Statistics"
+    organization: "EUROCONTROL"
+    official_url: "https://www.eurocontrol.int/service/data-demand-service"
+    license: >
+      EUROCONTROL Data Policy; research access available under specific agreements.
+      Public statistical data freely available.
+      Raw flight data requires Network Member or research agreement.
+      Terms: https://www.eurocontrol.int/sites/default/files/2019-06/eurocontrol-data-policy.pdf
+    commercial_use_ok: false
+    access_method: "manual_request"
+    requires_user_action: true
+    user_action_description: >
+      Public aggregated statistics are downloadable from the EUROCONTROL Statistics portal
+      (https://www.eurocontrol.int/our-data). For raw trajectory data, apply via
+      EUROCONTROL Research Collaboration: https://www.eurocontrol.int/network-manager/research
+    expected_format:
+      - "csv"
+      - "xlsx"
+      - "BADA aircraft performance"
+    estimated_volume: "Millions of flight records annually; select by ECAC area and date"
+    task_families: [6, 9]
+    citation: >
+      EUROCONTROL Network Manager.
+      EUROCONTROL Data Demand Service / Aviation Network Statistics.
+      Available at: https://www.eurocontrol.int/our-data
+    last_verified: "2026-05-17"
+    notes: >
+      BADA (Base of Aircraft Data) aircraft performance data requires separate license.
+      For Task Family 6 (ATC separation), use public STATFOR data for volume context;
+      use OpenSky for trajectory-level data unless EUROCONTROL access is obtained.
+    enabled: false
+
+  # ── 11. FAA Advisory Circulars ────────────────────────────────────────────
+  - source_id: "FAA_AC"
+    name: "FAA Advisory Circulars (AC)"
+    organization: "Federal Aviation Administration"
+    official_url: "https://www.faa.gov/regulations_policies/advisory_circulars/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+      - "html"
+    estimated_volume: "~1,500+ ACs across all subject areas; select relevant AC numbers"
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Advisory Circulars.
+      Available at: https://www.faa.gov/regulations_policies/advisory_circulars/
+    last_verified: "2026-05-17"
+    notes: >
+      Select ACs relevant to each task family. Priority list:
+        AC 120-92B (SMS), AC 60-22 (Aeronautical Decision Making),
+        AC 43-16A (Maintenance error), AC 120-16G (CAMP),
+        AC 91-36D (VFR waypoints), AC 00-6B (Aviation Weather),
+        AC 00-45H (Aviation Weather Services).
+      Download individual PDFs by AC number. Preserve AC number + issue date in provenance.
+    enabled: false
+
+  # ── 12. FAA Federal Aviation Regulations (CFR Title 14) ───────────────────
+  - source_id: "FAA_CFR14"
+    name: "Title 14 Code of Federal Regulations (Aeronautics and Space)"
+    organization: "Federal Aviation Administration / GPO"
+    official_url: "https://www.ecfr.gov/current/title-14"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "xml"
+      - "html"
+      - "json"
+    estimated_volume: "14 CFR Parts 1–199 and Parts 200–1199; select relevant Parts"
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    citation: >
+      Code of Federal Regulations, Title 14 — Aeronautics and Space.
+      Electronic Code of Federal Regulations (eCFR).
+      Available at: https://www.ecfr.gov/current/title-14
+    last_verified: "2026-05-17"
+    notes: >
+      Use eCFR API or bulk XML download for structured rule extraction.
+      Priority Parts: 1 (Definitions), 61, 91, 121, 135, 139.
+      Preserve Part + Section + revision date in provenance.
+      Rules change; always store the version date.
+    enabled: false
+
+  # ── 13. ICAO Documents ────────────────────────────────────────────────────
+  - source_id: "ICAO_DOCS"
+    name: "ICAO Annexes and PANS Documents"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://store.icao.int/"
+    license: >
+      ICAO copyright. Purchase required for most documents.
+      Some documents available free (selected Safety Management documents).
+      ICAO Doc 9859 (SMS Manual, 4th ed.) free: https://www.icao.int/safety/SafetyManagement/Pages/GuidanceDocuments.aspx
+    commercial_use_ok: false
+    access_method: "manual_request"
+    requires_user_action: true
+    user_action_description: >
+      Most ICAO Annexes and PANS (Doc 4444, Annex 3, Annex 13, etc.) require purchase
+      from ICAO Store (https://store.icao.int/). Institutional access may be available
+      via university library ICAO subscription. ICAO Doc 9859 (Safety Management Manual)
+      is available free at the URL above.
+    expected_format:
+      - "pdf"
+    estimated_volume: "Dozens of key documents; select by task family"
+    task_families: [1, 2, 3, 4, 5, 6, 7, 8]
+    citation: >
+      International Civil Aviation Organization (ICAO).
+      [Specific document title, Doc number, edition].
+      Montreal: ICAO, [year].
+    last_verified: "2026-05-17"
+    notes: >
+      Priority documents:
+        Annex 3 (Meteorology), Annex 13 (Accident Investigation),
+        Annex 15 (AIS/NOTAM), Annex 16 (Environmental Protection — not primary),
+        Doc 4444 PANS-ATM (Separation), Doc 9859 (SMS, free), Doc 9870 (Runway Incursion).
+      Verify institution has licensed copies before extracting text.
+      Mark provenance with Doc number + edition + year.
+    enabled: false
+
+  # ── 14. FAA Airport Diagrams ──────────────────────────────────────────────
+  - source_id: "FAA_AIRPORT_DIAGRAMS"
+    name: "FAA Aeronautical Information Services — Airport Diagrams"
+    organization: "Federal Aviation Administration"
+    official_url: "https://aeronav.faa.gov/d-tpp/AirportDiagrams.pdf"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+      - "georeferenced PDF"
+    estimated_volume: "~800+ U.S. airports with published diagrams"
+    task_families: [5]
+    citation: >
+      Federal Aviation Administration (FAA), Aeronautical Information Services (AIS).
+      Airport/Facility Directory (A/FD) — Airport Diagrams.
+      Available at: https://aeronav.faa.gov/d-tpp/AirportDiagrams.pdf
+    last_verified: "2026-05-17"
+    notes: >
+      Airport diagrams are published in 28-day AIRAC cycles.
+      Download the current d-TPP cycle PDF or individual airport diagram PDFs.
+      FAA also publishes georeferenced digital obstacle files and airport data at:
+      https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/
+      Use for Task Family 5 (airport surface operations) multimodal tasks.
+      Preserve AIRAC cycle and effective date in provenance.
+    enabled: false
+
+  # ── 15. FAA Wake Turbulence / Aircraft Type Data ──────────────────────────
+  - source_id: "FAA_WAKE_CATEGORIES"
+    name: "FAA Wake Turbulence Aircraft Category Tables (Order JO 7110.65 / RECAT)"
+    organization: "Federal Aviation Administration"
+    official_url: "https://www.faa.gov/air_traffic/publications/atpubs/atc_html/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "html"
+      - "pdf"
+    estimated_volume: "Tables within ATC manual chapters; structured extraction required"
+    task_families: [7]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Air Traffic Control (ATC) Order JO 7110.65 — Air Traffic Control.
+      Available at: https://www.faa.gov/air_traffic/publications/atpubs/atc_html/
+    last_verified: "2026-05-17"
+    notes: >
+      Wake turbulence separation tables are in Chapter 5 (Radar) of JO 7110.65.
+      RECAT-US (FAA Order JO 7110.659) provides updated categories.
+      Extract aircraft type → category mappings as structured YAML/JSON.
+      For LiDAR wake data, see LLWAS and research datasets (separate source).
+    enabled: false
+
+  # ── 16. EUROCONTROL RECAT-EU ──────────────────────────────────────────────
+  - source_id: "EUROCONTROL_RECAT"
+    name: "EUROCONTROL RECAT-EU Wake Turbulence Categorisation"
+    organization: "EUROCONTROL"
+    official_url: "https://www.eurocontrol.int/concept/recat-eu"
+    license: >
+      EUROCONTROL public guidance; publicly available documents.
+    commercial_use_ok: "unknown"
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+      - "html"
+    estimated_volume: "Reference documents and aircraft category tables"
+    task_families: [7]
+    citation: >
+      EUROCONTROL.
+      RECAT-EU — European Wake Turbulence Categorisation and Separation Minima.
+      Available at: https://www.eurocontrol.int/concept/recat-eu
+    last_verified: "2026-05-17"
+    notes: >
+      RECAT-EU defines 6 categories (A–F) for European operations.
+      Cross-reference with FAA RECAT-US for comparative task construction.
+    enabled: false
+
+  # ── 17. FAA Minimum Equipment List / MMEL ─────────────────────────────────
+  - source_id: "FAA_MMEL"
+    name: "FAA Master Minimum Equipment List (MMEL) Documents"
+    organization: "Federal Aviation Administration"
+    official_url: "https://rgl.faa.gov/Regulatory_and_Guidance_Library/rgMakeModel.nsf/0/MainFrameSet"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+    estimated_volume: "One MMEL per aircraft make/model; ~200+ documents"
+    task_families: [8]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Master Minimum Equipment List (MMEL) Policy Letter and Aircraft-Specific MMELs.
+      Available at: https://rgl.faa.gov/
+    last_verified: "2026-05-17"
+    notes: >
+      Select MMELs for common commercial aircraft types (B737, B777, A320, A350).
+      MMEL tables define ATA chapter, item description, categories A/B/C/D,
+      O-items, M-items, and dispatch conditions.
+      Extract structured MEL rules as knowledge points for Task Family 8.
+    enabled: false
+
+  # ── 18. ICAO Doc 9981 / Airport Operations Manuals ────────────────────────
+  - source_id: "ICAO_AIRPORT_OPS"
+    name: "ICAO Doc 9981 — PANS-Aerodromes and Airport Operations Guidance"
+    organization: "International Civil Aviation Organization"
+    official_url: "https://www.icao.int/safety/pages/PANS-Aerodromes.aspx"
+    license: >
+      ICAO copyright. May require purchase or institutional access.
+    commercial_use_ok: false
+    access_method: "manual_request"
+    requires_user_action: true
+    user_action_description: >
+      ICAO Doc 9981 may require purchase from the ICAO Store (https://store.icao.int/).
+      Check if your institution has licensed access. Alternatively, refer to ICAO Annex 14
+      (Aerodromes) which is similarly licensed.
+    expected_format:
+      - "pdf"
+    estimated_volume: "Single document; select relevant chapters"
+    task_families: [5]
+    citation: >
+      International Civil Aviation Organization (ICAO).
+      Doc 9981 — PANS-Aerodromes, 2nd Edition.
+      Montreal: ICAO, 2020.
+    last_verified: "2026-05-17"
+    notes: >
+      Used for Task Family 5 (airport surface operations) rule extraction.
+      Supplement with FAA AC 150/5300-13A (Airport Design) which is public domain.
+    enabled: false
+
+  # ── 19. FAA Airport Design Advisory Circular ──────────────────────────────
+  - source_id: "FAA_AC_AIRPORT_DESIGN"
+    name: "FAA AC 150/5300-13A — Airport Design"
+    organization: "Federal Aviation Administration"
+    official_url: "https://www.faa.gov/airports/engineering/advisory_circulars/"
+    license: >
+      Public domain (U.S. Government work, 17 U.S.C. §105).
+    commercial_use_ok: true
+    access_method: "direct_download"
+    requires_user_action: false
+    user_action_description: null
+    expected_format:
+      - "pdf"
+    estimated_volume: "Single AC document (~600 pages)"
+    task_families: [5]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Advisory Circular AC 150/5300-13A — Airport Design.
+      Available at: https://www.faa.gov/airports/engineering/advisory_circulars/
+    last_verified: "2026-05-17"
+    notes: >
+      Provides taxiway and runway geometry standards, separation criteria,
+      and hot spot definitions useful for Task Family 5.
+    enabled: false
+
+  # ── 20. FAA SWIM / TFMS Flight Data ───────────────────────────────────────
+  - source_id: "FAA_TFMS"
+    name: "FAA Traffic Flow Management System (TFMS) Data"
+    organization: "Federal Aviation Administration"
+    official_url: "https://tfm.faa.gov/"
+    license: >
+      Some TFMS aggregate data is public. Raw flight-level data requires
+      FAA data sharing agreement.
+    commercial_use_ok: "unknown"
+    access_method: "manual_request"
+    requires_user_action: true
+    user_action_description: >
+      TFMS aggregate reports (ASPM, OPSNET) available at https://aspm.faa.gov/.
+      Raw GDP/EDCT data requires FAA data-sharing agreement.
+      Contact: FAA Air Traffic Organization, System Operations.
+    expected_format:
+      - "csv"
+      - "xlsx"
+    estimated_volume: "Aggregate stats freely available; flight-level restricted"
+    task_families: [9]
+    citation: >
+      Federal Aviation Administration (FAA).
+      Traffic Flow Management System (TFMS).
+      Available at: https://tfm.faa.gov/
+    last_verified: "2026-05-17"
+    notes: >
+      Use public OPSNET data (https://aspm.faa.gov/opsnet/sys/main.asp)
+      for airport capacity and delay statistics.
+      For Task Family 9 (GDP scenarios), construct synthetic instances grounded
+      in real airport capacity parameters from ASPM data.
+      Mark GDP scenario instances as SYNTHETIC per CLAUDE.md §2.2.
+    enabled: false
