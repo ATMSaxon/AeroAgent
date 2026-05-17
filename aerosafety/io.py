@@ -7,9 +7,9 @@ from this module — do not duplicate or shadow these types elsewhere.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Any, Literal
 
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # ToolCall
@@ -20,9 +20,9 @@ class ToolCall(BaseModel):
 
     name: str
     args: dict[str, Any]
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    runtime_ms: Optional[float] = None
+    result: Any | None = None
+    error: str | None = None
+    runtime_ms: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ class RetrievedDoc(BaseModel):
     doc_id: str
     source: str
     chunk_text: str
-    score: Optional[float] = None
+    score: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -88,25 +88,25 @@ class AgentTrace(BaseModel):
     retrieved_docs: list[RetrievedDoc] = Field(default_factory=list)
 
     # Output
-    final_recommendation: Optional[Recommendation] = None
-    raw_output: Optional[str] = None
+    final_recommendation: Recommendation | None = None
+    raw_output: str | None = None
 
     # Confidence (0–1); None means the agent did not emit a calibrated score
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
     # Escalation flag
     requested_escalation: bool = False
 
     # Performance
-    total_runtime_ms: Optional[float] = None
-    token_usage: Optional[dict[str, int]] = None  # {"prompt": N, "completion": M, "total": N+M}
+    total_runtime_ms: float | None = None
+    token_usage: dict[str, int] | None = None  # {"prompt": N, "completion": M, "total": N+M}
 
     # Hardware / environment
-    hardware: Optional[dict[str, Any]] = None
+    hardware: dict[str, Any] | None = None
 
     # Timestamps (ISO-8601)
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
+    started_at: str | None = None
+    finished_at: str | None = None
 
     # Failure flags (per CLAUDE.md §4.3)
     had_tool_error: bool = False
@@ -128,11 +128,11 @@ class TaskProvenance(BaseModel):
 
     # One of: a human-readable citation string OR "SYNTHETIC"
     source: str
-    access_date: Optional[str] = None   # ISO-8601 date; None iff source == "SYNTHETIC"
+    access_date: str | None = None   # ISO-8601 date; None iff source == "SYNTHETIC"
     # Required when source == "SYNTHETIC"
-    generation_rule: Optional[str] = None
+    generation_rule: str | None = None
     # License/data-use notes
-    license: Optional[str] = None
+    license: str | None = None
 
 
 class TaskCard(BaseModel):
@@ -169,4 +169,4 @@ class TaskCard(BaseModel):
     provenance: TaskProvenance
 
     # Optional split tag
-    split: Optional[Literal["dev", "test"]] = None
+    split: Literal["dev", "test"] | None = None

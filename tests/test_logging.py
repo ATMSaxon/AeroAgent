@@ -6,14 +6,15 @@ from pathlib import Path
 import pytest
 
 from aerosafety.io import AgentTrace
-from aerosafety.logging import ExperimentLogger, get_logger
+from aerosafety.logging import ExperimentLogger, RunIdMismatchError, get_logger
 
 
 def test_experiment_logger_writes_jsonl(
     minimal_agent_trace: AgentTrace, log_dir: Path
 ) -> None:
-    out = log_dir / "run-001.jsonl"
-    with ExperimentLogger("run-001", out) as el:
+    # Logger run_id must match the fixture's trace run_id ("test-run-001")
+    out = log_dir / "test-run-001.jsonl"
+    with ExperimentLogger("test-run-001", out) as el:
         el.log_trace(minimal_agent_trace)
         el.log_trace(minimal_agent_trace)
     assert el.traces_written == 2
@@ -22,7 +23,7 @@ def test_experiment_logger_writes_jsonl(
     assert len(lines) == 2
     rec = json.loads(lines[0])
     assert rec["task_id"] == minimal_agent_trace.task_id
-    assert rec["run_id"] == "run-001"
+    assert rec["run_id"] == "test-run-001"
     assert "hardware" in rec
 
 
@@ -51,6 +52,15 @@ def test_experiment_logger_not_open_raises(
     el = ExperimentLogger("run-x", log_dir / "x.jsonl")
     with pytest.raises(RuntimeError):
         el.log_trace(minimal_agent_trace)
+
+
+def test_experiment_logger_rejects_mismatched_run_id(
+    minimal_agent_trace: AgentTrace, log_dir: Path
+) -> None:
+    out = log_dir / "other-run.jsonl"
+    with pytest.raises(RunIdMismatchError, match="logger run_id 'other-run' does not match trace run_id 'test-run-001'"):
+        with ExperimentLogger("other-run", out) as el:
+            el.log_trace(minimal_agent_trace)
 
 
 def test_get_logger_returns_logger() -> None:
