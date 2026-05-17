@@ -38,6 +38,9 @@ data/raw/*/*
 !data/raw/*/*/
 data/raw/*/*/*
 !data/raw/**/manifest.jsonl
+# data/multimodal/: images are versioned ground truth (CLAUDE.md §5.2)
+!data/multimodal/**/manifest.jsonl
+!data/multimodal/**/*.png
 
 # Model checkpoints
 checkpoints/
