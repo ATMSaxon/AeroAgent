@@ -74,7 +74,7 @@ sources:
     notes: >
       Reports are de-identified. Download via ASRS database search (bulk CSV).
       Mark all derived records with source_type=ASRS_VOLUNTARY_REPORT.
-    enabled: false
+    enabled: true
 
   # ── 2. NTSB Aviation Accident Database ────────────────────────────────────
   - source_id: "NTSB_ACCIDENT_DB"
@@ -107,7 +107,7 @@ sources:
       Structured CSV available for bulk download.
       Full narrative PDFs available per event via CAROL web UI.
       Do not infer probable cause beyond what NTSB states.
-    enabled: false
+    enabled: true
 
   # ── 3. NTSB Full Accident Reports (PDF) ───────────────────────────────────
   - source_id: "NTSB_FULL_REPORTS"
@@ -136,7 +136,7 @@ sources:
     notes: >
       Full reports provide richer narrative for causal chain reconstruction.
       Limit to reports with structured probable cause sections.
-    enabled: false
+    enabled: true
 
   # ── 4. Iowa State Mesonet — METAR Archive (primary METAR source) ────────────
   - source_id: "IEM_METAR"
@@ -176,7 +176,7 @@ sources:
       Use report_type=3 for METAR observations.
       See IEM_TAF (entry below) for Terminal Aerodrome Forecasts.
       Select priority high-traffic airports (KLAX, KJFK, KORD, KATL, EGLL, RJTT, etc.).
-    enabled: false
+    enabled: true
 
   # ── 5. Iowa State Mesonet — TAF Archive (primary TAF source) ─────────────
   - source_id: "IEM_TAF"
@@ -214,7 +214,7 @@ sources:
       Parameters: station=ICAO, year1/month1/day1, year2/month2/day2, tz=UTC, format=csv.
       Rate limit: shared 300 req/hr cap with IEM_METAR — same 12-second delay applies.
       Fallback: OGIMET_TAF for non-US stations not covered by IEM.
-    enabled: false
+    enabled: true
 
   # ── 6. OGIMET — METAR/SYNOP Archive (secondary METAR/TAF source) ──────────
   - source_id: "OGIMET_METAR"
@@ -317,7 +317,7 @@ sources:
       for the purpose of KP extraction and format grounding.
       Real NOTAM volume for Task Family 4 will come from ADS-B Exchange NOTAM
       feed (see ADSB_EXCHANGE) or ICAO Annex 15 worked examples.
-    enabled: false
+    enabled: true
 
   # ── 9. eCFR Title 14 — Code of Federal Regulations ───────────────────────
   - source_id: "FAA_CFR14"
@@ -348,7 +348,7 @@ sources:
       Use eCFR XML bulk download or eCFR API (no key required).
       Priority Parts: 1 (Definitions), 61, 91, 121, 135, 139.
       Preserve Part + Section + revision date in provenance.
-    enabled: false
+    enabled: true
 
   # ── 10. FAA Airport Diagrams ───────────────────────────────────────────────
   - source_id: "FAA_AIRPORT_DIAGRAMS"
@@ -535,7 +535,7 @@ sources:
     notes: >
       Defines 6 categories (A–F) for European operations.
       Cross-reference with FAA RECAT-US tables from FAA_DOCS (JO 7110.65).
-    enabled: false
+    enabled: true
 
   # ── 16. ICAO Doc 8643 — Aircraft Type Designators ─────────────────────────
   - source_id: "ICAO_DOC8643"
