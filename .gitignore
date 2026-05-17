@@ -24,13 +24,20 @@ secrets/
 
 # Data (large files; tracked via DVC or separate storage)
 data/corpora/
-data/raw/
 data/eval/eval_set.jsonl
 data/eval/dev_set.jsonl
 *.jsonl
 !tests/fixtures/*.jsonl
 # Task cards are versioned ground truth — must be tracked
 !aerosafety/tasks/**/*.jsonl
+# data/raw/: exclude large downloaded contents but keep README + integrity manifests
+data/raw/*
+!data/raw/README.md
+!data/raw/*/
+data/raw/*/*
+!data/raw/*/*/
+data/raw/*/*/*
+!data/raw/**/manifest.jsonl
 
 # Model checkpoints
 checkpoints/
