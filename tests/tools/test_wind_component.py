@@ -141,8 +141,9 @@ class TestWindComponentValidation:
             calculate_wind_components(270, -5, 180)
 
     def test_direction_out_of_range_high_raises(self):
+        # 360 is now valid (runway 36 convention); 361 must still raise
         with pytest.raises(WindComponentError):
-            calculate_wind_components(360, 10, 180)
+            calculate_wind_components(361, 10, 180)
 
     def test_direction_out_of_range_low_raises(self):
         with pytest.raises(WindComponentError):

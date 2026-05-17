@@ -1,7 +1,9 @@
 # AeroSafetyEval — Authoritative Data Source Registry
 #
 # Governed by CLAUDE.md §2.1 (Authoritative Sources Only).
-# Updated 2026-05-17: added residency_restriction field per PI constraint.
+# v1.1.0 (2026-05-17): added residency_restriction field per PI constraint.
+# v1.2.0 (2026-05-17): split IEM_METAR/IEM_TAF; added OGIMET_TAF; added
+#   substitute_source field to FAA_NOTAM_API; renumbered all entries.
 # All sources on the critical path must have residency_restriction: none.
 #
 # Fields:
@@ -21,6 +23,8 @@
 #     "commercial_license" = requires paid license regardless of residency
 #   critical_path: bool                  — true if on the pilot-task critical path
 #   alternative_source_id: str | null    — if not critical_path, which source replaces it
+#   substitute_source: str | null        — for off-critical-path sources, describes what
+#                                          we actually use in Phase 1 instead
 #   user_action_description: str | null
 #   expected_format: list[str]
 #   estimated_volume: str
@@ -432,7 +436,7 @@ sources:
       Extract MEL category (A/B/C/D), O-item, M-item as structured KPs.
     enabled: false
 
-  # ── 11. OpenSky Network — ADS-B Trajectories ──────────────────────────────
+  # ── 13. OpenSky Network — ADS-B Trajectories ──────────────────────────────
   - source_id: "OPENSKY_ADSB"
     name: "OpenSky Network — Historical ADS-B Data (Impala/Trino)"
     organization: "OpenSky Network (EU-hosted open research consortium)"
@@ -470,7 +474,7 @@ sources:
       Restrict to terminal area bounding boxes (~50 NM radius).
     enabled: false
 
-  # ── 12. ADS-B Exchange — ADS-B Archive ────────────────────────────────────
+  # ── 14. ADS-B Exchange — ADS-B Archive ────────────────────────────────────
   - source_id: "ADSB_EXCHANGE"
     name: "ADS-B Exchange — Crowd-sourced ADS-B Archive"
     organization: "ADS-B Exchange (community project)"
@@ -503,7 +507,7 @@ sources:
       Useful for cross-validation or gap-filling.
     enabled: false
 
-  # ── 13. EUROCONTROL RECAT-EU — Wake Turbulence Categorisation ─────────────
+  # ── 15. EUROCONTROL RECAT-EU — Wake Turbulence Categorisation ─────────────
   - source_id: "EUROCONTROL_RECAT"
     name: "EUROCONTROL RECAT-EU Wake Turbulence Categorisation"
     organization: "EUROCONTROL"
@@ -533,7 +537,7 @@ sources:
       Cross-reference with FAA RECAT-US tables from FAA_DOCS (JO 7110.65).
     enabled: false
 
-  # ── 14. ICAO Doc 8643 — Aircraft Type Designators ─────────────────────────
+  # ── 16. ICAO Doc 8643 — Aircraft Type Designators ─────────────────────────
   - source_id: "ICAO_DOC8643"
     name: "ICAO Doc 8643 — Aircraft Type Designators"
     organization: "International Civil Aviation Organization"
@@ -565,7 +569,7 @@ sources:
       Extract as structured YAML/JSON for wake category lookup in Task Family 7.
     enabled: false
 
-  # ── 15. ICAO Doc 9859 — Safety Management Manual (free) ───────────────────
+  # ── 17. ICAO Doc 9859 — Safety Management Manual (free) ───────────────────
   - source_id: "ICAO_DOC9859"
     name: "ICAO Doc 9859 — Safety Management Manual (4th Edition, free)"
     organization: "International Civil Aviation Organization"
@@ -595,7 +599,7 @@ sources:
       Relevant for Task Families 1 and 2 (ASRS/NTSB KP extraction).
     enabled: false
 
-  # ── 16. ICAO Doc 9870 — Prevention of Runway Incursions (free) ────────────
+  # ── 18. ICAO Doc 9870 — Prevention of Runway Incursions (free) ────────────
   - source_id: "ICAO_DOC9870"
     name: "ICAO Doc 9870 — Manual on the Prevention of Runway Incursions"
     organization: "International Civil Aviation Organization"
@@ -630,7 +634,7 @@ sources:
 # Retained for completeness; must not be on critical path.
 # ============================================================================
 
-  # ── 17. FAA NOTAM API (off critical path — us_resident restriction) ────────
+  # ── 19. FAA NOTAM API (off critical path — us_resident restriction) ────────
   - source_id: "FAA_NOTAM_API"
     name: "FAA NOTAM API (api.faa.gov)"
     organization: "Federal Aviation Administration"
@@ -643,6 +647,16 @@ sources:
     residency_restriction: "us_resident"
     critical_path: false
     alternative_source_id: "FAA_DOCS"
+    substitute_source: >
+      Phase 1 NOTAM task generation uses two substitute sources instead of this API:
+      (1) FAA_DOCS — JO 7930.2 (NOTAM System Order) provides authoritative NOTAM format
+          specifications, Q-code taxonomy, and annotated examples for KP extraction.
+          Chapter 1 defines structure; Appendices contain real worked examples.
+      (2) ICAO Annex 15 worked examples — transcribed from public ICAO safety guidance
+          documents (ICAO Doc 9859, Doc 9870 appendices) for international NOTAM format grounding.
+      Together these cover NOTAM format grounding without requiring API access.
+      Live NOTAM volume for scenario construction is deferred to Phase 2 when
+      US-resident API access can be confirmed or an alternative aggregator identified.
     user_action_description: >
       Requires free API key registration at https://api.faa.gov.
       The API ToS and account system are oriented toward US-based users.
@@ -656,14 +670,12 @@ sources:
       NOTAM API. Available at: https://api.faa.gov/notamapi/
     last_verified: "2026-05-17"
     notes: >
-      OFF CRITICAL PATH. Replaced by FAA_DOCS (JO 7930.2 NOTAM format reference)
-      for KP extraction and format grounding.
-      For live NOTAM volume in Task Family 4, use ICAO Annex 15 worked examples
-      and publicly archived NOTAM snapshots (academic publications).
-      Re-enable only if team-lead confirms US-resident access is available.
+      OFF CRITICAL PATH (residency_restriction=us_resident).
+      See substitute_source field above for Phase 1 alternatives.
+      Re-enable only if team-lead confirms US-resident API access is available.
     enabled: false
 
-  # ── 18. NOAA Aviation Weather API (off critical path — replaced by IEM) ────
+  # ── 20. NOAA Aviation Weather API (off critical path — replaced by IEM) ────
   - source_id: "NOAA_AWC_API"
     name: "NOAA Aviation Weather Center Data API (aviationweather.gov)"
     organization: "NOAA / National Weather Service"
@@ -693,7 +705,7 @@ sources:
       and with a deeper historical archive.
     enabled: false
 
-  # ── 19. EUROCONTROL DDS / PRISME (off critical path — eu_member) ──────────
+  # ── 21. EUROCONTROL DDS / PRISME (off critical path — eu_member) ──────────
   - source_id: "EUROCONTROL_DDS"
     name: "EUROCONTROL Data Demand Service (DDS) / Network Statistics"
     organization: "EUROCONTROL"
@@ -724,7 +736,7 @@ sources:
       Re-enable only if institutional EU/ECAC membership provides access.
     enabled: false
 
-  # ── 20. ICAO Purchased Documents (off critical path — commercial_license) ──
+  # ── 22. ICAO Purchased Documents (off critical path — commercial_license) ──
   - source_id: "ICAO_DOCS_PURCHASED"
     name: "ICAO Annexes and PANS (purchased documents)"
     organization: "International Civil Aviation Organization"

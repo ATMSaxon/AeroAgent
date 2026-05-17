@@ -98,7 +98,7 @@ def check_mel(aircraft_type: str, system_or_item: str) -> MELCheckResult:
             "proprietary. This stub MUST NOT be used for dispatch decisions."
         ),
         action_required=(
-            "CONSULT THE OPERATOR'S FAA/EASA-APPROVED MINIMUM EQUIPMENT LIST "
+            "CONSULT THE OPERATOR'S FAA/EASA-APPROVED MINIMUM EQUIPMENT LIST (MEL) "
             "AND QUALIFIED MAINTENANCE/DISPATCH PERSONNEL."
         ),
     )

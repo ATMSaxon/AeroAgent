@@ -90,10 +90,12 @@ _HDR_RE = re.compile(
 )
 
 # Q-line
+# Coordinate format: DDDDNdddddErrr or DDDDSdddddWrrr (lat=4 digits + N/S,
+# lon=5 digits + E/W, radius=3 digits). Example: 4038N07356W025
 _Q_RE = re.compile(
     r"Q\)\s*(?P<fir>[A-Z]{4})/(?P<code>Q[A-Z]{4})/(?P<tfc>[A-Z/]+)/"
     r"(?P<purp>[A-Z/]+)/(?P<scope>[A-Z/]+)/(?P<lower>\d{3})/(?P<upper>\d{3})/"
-    r"(?P<coords>[0-9NS]{4,5}[EW]\d{3,5}[EW]\d{3})"
+    r"(?P<coords>\d{4}[NS]\d{5}[EW]\d{3})"
 )
 
 # Simple field extractors — each line begins with letter and )
@@ -104,8 +106,13 @@ _FIELD_RE = re.compile(
 # Datetime: YYMMDDHHmm (10 digits)
 _DT_RE = re.compile(r"(?P<yy>\d{2})(?P<mo>\d{2})(?P<dd>\d{2})(?P<hh>\d{2})(?P<mm>\d{2})")
 
-# Runway pattern: RWY nn[LRC] or RW nn[LRC] in E text
-_RWY_RE = re.compile(r"\bRW(?:Y)?\s*(?P<id>\d{2}[LRC]?)\b")
+# Runway extraction: find each RWY/RW keyword, then collect all \d{2}[LRC]?
+# identifiers within the next 40 characters, stopping before the first
+# 4+-letter word that is not AND/OR (e.g. stop at CLOSED, FOR, MAINTENANCE).
+# Handles: "RWY 13R/31L", "RWY 13R AND 31L", "RWY 09", "RWY 13/31".
+_RWY_ANCHOR_RE = re.compile(r"\bRW(?:Y)?\b", re.IGNORECASE)
+_RWY_ID_RE = re.compile(r"\b(\d{2}[LRC]?)\b")
+_RWY_STOP_RE = re.compile(r"\b(?!AND\b|OR\b)[A-Z]{4,}\b", re.IGNORECASE)
 
 # Taxiway pattern: TWY [A-Z]+[0-9]* in E text
 _TWY_RE = re.compile(r"\bTWY\s+(?P<id>[A-Z][A-Z0-9]*)\b")
@@ -218,9 +225,19 @@ def parse_notam(raw: str) -> NOTAMObservation:
     # G) Upper limit
     upper_limit = fields.get("G", None)
 
-    # Extract runway and taxiway IDs from E text
-    affected_runways = list({m.group("id") for m in _RWY_RE.finditer(text)})
-    affected_taxiways = list({m.group("id") for m in _TWY_RE.finditer(text)})
+    # Extract runway IDs: anchor on each RWY/RW keyword, then scan the next
+    # 40 chars for \d{2}[LRC]? tokens, stopping at the first 4+-letter
+    # non-AND/OR word. Handles slash- and AND-separated lists.
+    runway_ids: set[str] = set()
+    for anchor in _RWY_ANCHOR_RE.finditer(text):
+        segment = text[anchor.end():anchor.end() + 40]
+        stop = _RWY_STOP_RE.search(segment)
+        if stop:
+            segment = segment[: stop.start()]
+        for id_match in _RWY_ID_RE.finditer(segment):
+            runway_ids.add(id_match.group(1))
+    affected_runways = sorted(runway_ids)
+    affected_taxiways = sorted({m.group("id") for m in _TWY_RE.finditer(text)})
 
     return NOTAMObservation(
         raw=raw,

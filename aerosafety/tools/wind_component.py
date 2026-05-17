@@ -6,11 +6,12 @@ Standard: FAA Pilot's Handbook of Aeronautical Knowledge (FAA-H-8083-25C),
   https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/phak
 
 HEADING CONVENTION (critical for safety — CLAUDE.md §8.1):
-    ALL angles in this module are MAGNETIC degrees (0-359).
-    Runway headings from published aeronautical charts are magnetic.
-    Wind direction from METAR is MAGNETIC when reported in degrees
-    (WMO FM 15 §15.4.3: "direction from which wind blows, in degrees
-    true" — but FAA METAR practice reports magnetic; this module
+    ALL angles in this module are MAGNETIC degrees (0-360).
+    Both 0 and 360 represent north (runway 36 = 360°); they are treated
+    identically. Runway headings from published aeronautical charts are
+    magnetic. Wind direction from METAR is MAGNETIC when reported in
+    degrees (WMO FM 15 §15.4.3: "direction from which wind blows, in
+    degrees true" — but FAA METAR practice reports magnetic; this module
     accepts MAGNETIC and raises if True/Magnetic distinction is
     ambiguous in the caller's context).
 
@@ -67,9 +68,12 @@ def calculate_wind_components(
     Mixing magnetic and true values produces an incorrect result.
 
     Args:
-        wind_direction_deg: Direction FROM which the wind blows (0-359, magnetic).
+        wind_direction_deg: Direction FROM which the wind blows (0-360, magnetic).
+                            360 is accepted and treated identically to 0 (north).
         wind_speed_kt:       Wind speed in knots (must be >= 0).
-        runway_heading_deg:  Runway magnetic heading (0-359).
+        runway_heading_deg:  Runway magnetic heading (0-360).
+                            360 is accepted and treated identically to 0
+                            (runway 36 has heading 360°).
 
     Returns:
         WindComponentResult with headwind_kt, crosswind_kt, tailwind_kt.
@@ -97,17 +101,17 @@ def calculate_wind_components(
     Standard: FAA-H-8083-25C Chapter 5
     Reference: https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/phak
     """
-    if not (0 <= wind_direction_deg <= 359):
+    if not (0 <= wind_direction_deg <= 360):
         raise WindComponentError(
-            f"wind_direction_deg must be 0-359, got {wind_direction_deg}"
+            f"wind_direction_deg must be 0-360, got {wind_direction_deg}"
         )
     if wind_speed_kt < 0:
         raise WindComponentError(
             f"wind_speed_kt must be >= 0, got {wind_speed_kt}"
         )
-    if not (0 <= runway_heading_deg <= 359):
+    if not (0 <= runway_heading_deg <= 360):
         raise WindComponentError(
-            f"runway_heading_deg must be 0-359, got {runway_heading_deg}"
+            f"runway_heading_deg must be 0-360, got {runway_heading_deg}"
         )
 
     # Angle from runway heading to wind direction (where wind comes FROM)
