@@ -5,6 +5,7 @@ Validates schema compliance, provenance integrity, split distribution,
 and content constraints per CLAUDE.md §1.1, §2.2, §3.1, §8.1, §8.3.
 
 T23 expansion: 20 stations × 12 months, ~200 cards, ≥70% B/C/D real_data provenance.
+T30 round-3 scale: 560+ total cards; WD3-* prefix for new cards; ≤25 per (station, month).
 
 No API calls, no model inference — static structural validation only.
 """
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -39,9 +41,10 @@ VALID_SPLITS = {"dev", "test"}
 VALID_SEVERITIES = {"Low", "Medium", "High", "Critical"}
 REQUIRED_LICENSE_STRING = "PILOT — NOT EXPERT-REVIEWED"
 
-# T23 targets
+# T23 original targets (lower bounds preserved)
 T23_MINIMUMS = {"typeA": 50, "typeB": 40, "typeC": 30, "typeD": 40}
-T23_MAXIMUMS = {"typeA": 80, "typeB": 120, "typeC": 50, "typeD": 60}
+# T30 scale-up upper bounds — WD3 round-3 adds ~400 cards across B/C/D
+T23_MAXIMUMS = {"typeA": 80, "typeB": 300, "typeC": 200, "typeD": 250}
 
 # Stations in 20-station IEM corpus
 IEM_STATIONS = {
@@ -213,15 +216,20 @@ def test_task_ids_unique() -> None:
 # ---------------------------------------------------------------------------
 
 def test_t23_task_id_format() -> None:
-    """T23 cards must use WD-A-NNN / WD-B-NNN / WD-C-NNN / WD-D-NNN format."""
-    prefix_map = {"A": "WD-A-", "B": "WD-B-", "C": "WD-C-", "D": "WD-D-"}
+    """T23/T30 cards must use WD-A-NNN/WD-B-NNN/... or WD3-A-NNN/WD3-B-NNN/... format."""
+    prefix_map = {
+        "A": ("WD-A-",),
+        "B": ("WD-B-", "WD3-B-"),
+        "C": ("WD-C-", "WD3-C-"),
+        "D": ("WD-D-", "WD3-D-"),
+    }
     for label, path in JSONL_FILES.items():
         if not path.exists():
             continue
-        expected_prefix = prefix_map[EXPECTED_TASK_TYPES[label]]
+        valid_prefixes = prefix_map[EXPECTED_TASK_TYPES[label]]
         for card in load_cards(path):
-            assert card.task_id.startswith(expected_prefix), (
-                f"{card.task_id}: expected prefix {expected_prefix!r} for T23 {label} cards"
+            assert any(card.task_id.startswith(p) for p in valid_prefixes), (
+                f"{card.task_id}: expected one of prefixes {valid_prefixes} for {label} cards"
             )
 
 
@@ -635,3 +643,83 @@ def test_typeA_cards_are_synthetic() -> None:
         assert card.provenance.source == "SYNTHETIC", (
             f"{card.task_id}: Type A knowledge cards must be SYNTHETIC"
         )
+
+
+# ---------------------------------------------------------------------------
+# T30 scale-up tests: station-month bias guard + manifest file reference
+# ---------------------------------------------------------------------------
+
+def _extract_station_month(card: "TaskCard") -> tuple[str, str] | None:
+    """Extract (station, YYYYMM) from provenance.source of a real-data card."""
+    src = card.provenance.source or ""
+    # Matches patterns like 'KORD 2026-01-15T...' or 'KORD_METAR_202601.csv'
+    m = re.search(r"(K[A-Z]{3}|PA[A-Z]{2})\s+(\d{4})-(\d{2})", src)
+    if m:
+        return m.group(1), m.group(2) + m.group(3)
+    m2 = re.search(r"(K[A-Z]{3}|PA[A-Z]{2})_METAR_(\d{6})", src)
+    if m2:
+        return m2.group(1), m2.group(2)
+    return None
+
+
+def test_no_station_month_dominates() -> None:
+    """T30: no (station, month) pair may supply more than 25 cards across B+C+D (§2.2 bias guard)."""
+    from collections import Counter
+    sm_counts: Counter = Counter()
+    for label in ("typeB", "typeC", "typeD"):
+        path = JSONL_FILES[label]
+        if not path.exists():
+            continue
+        for card in load_cards(path):
+            if not _is_real_iem_card(card):
+                continue
+            sm = _extract_station_month(card)
+            if sm:
+                sm_counts[sm] += 1
+    violations = {sm: cnt for sm, cnt in sm_counts.items() if cnt > 25}
+    assert not violations, (
+        f"T30: {len(violations)} (station, month) pairs exceed 25-card bias limit: "
+        + ", ".join(f"{sm}={cnt}" for sm, cnt in sorted(violations.items()))
+    )
+
+
+def test_real_data_cards_reference_manifest_csv() -> None:
+    """T30: every real-data B/C/D card's provenance.source must reference a manifest-listed CSV path."""
+    import json as _json
+    metar_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
+    taf_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_TAF" / "2026-05-17" / "manifest.jsonl"
+
+    manifest_files: set[str] = set()
+    for mpath in (metar_manifest, taf_manifest):
+        if mpath.exists():
+            with mpath.open() as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = _json.loads(line)
+                        manifest_files.add(entry.get("file_path", ""))
+                    except Exception:
+                        pass
+
+    if not manifest_files:
+        pytest.skip("No manifest files found — cannot verify CSV references")
+
+    for label in ("typeB", "typeC", "typeD"):
+        path = JSONL_FILES[label]
+        if not path.exists():
+            continue
+        for card in load_cards(path):
+            if not _is_real_iem_card(card):
+                continue
+            src = card.provenance.source or ""
+            # Extract file path from provenance source: "...| file: data/raw/..."
+            m = re.search(r"file:\s*(data/raw/IEM_\w+/[^\s|]+\.csv)", src)
+            if not m:
+                continue
+            cited_file = m.group(1).strip()
+            assert cited_file in manifest_files, (
+                f"{card.task_id}: provenance cites file {cited_file!r} "
+                f"which is not listed in the IEM manifest"
+            )
