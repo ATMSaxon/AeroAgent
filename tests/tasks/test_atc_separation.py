@@ -100,8 +100,8 @@ def test_all_cards_parse(all_cards: list[TaskCard]) -> None:
 
 def test_total_card_count(all_cards: list[TaskCard]) -> None:
     n = len(all_cards)
-    assert 65 <= n <= 90, (
-        f"Expected 65-90 task cards total (per T18 brief 70-80 target), got {n}"
+    assert 400 <= n, (
+        f"Expected ≥400 task cards total (T31 F6 scale-up target), got {n}"
     )
 
 
@@ -120,10 +120,12 @@ def test_task_ids_unique(all_cards: list[TaskCard]) -> None:
 
 def test_task_id_format(all_cards: list[TaskCard]) -> None:
     import re
-    pattern = re.compile(r"^AS-[ABCD]-\d{3}$")
+    # AS-* for original 82 cards; ATC2-* for T31 scale-up cards
+    pattern = re.compile(r"^(?:AS|ATC2)-[ABCD]-\d{3}$")
     for card in all_cards:
         assert pattern.match(card.task_id), (
-            f"task_id {card.task_id!r} does not match expected format AS-<TYPE>-<NNN>"
+            f"task_id {card.task_id!r} does not match expected format AS-<TYPE>-<NNN> "
+            f"or ATC2-<TYPE>-<NNN>"
         )
 
 
@@ -132,19 +134,22 @@ def test_type_counts_within_spec(all_cards: list[TaskCard]) -> None:
     for card in all_cards:
         by_type[card.task_type] = by_type.get(card.task_type, 0) + 1
 
-    # Per T18 brief:
-    # Type A: 25-35, Type B: 18-22, Type C: 12-15, Type D: 10-15
+    # T31 F6 scale-up targets (supersedes T18 bounds):
+    # Type A: 25-35 (unchanged — synthetic knowledge cards)
+    # Type B: ≥200 (hazard identification, scaled from real ADS-B + ops data)
+    # Type C: ≥80 (consequence analysis)
+    # Type D: ≥60 (agentic tool-use)
     assert 25 <= by_type.get("A", 0) <= 35, (
         f"Type A count {by_type.get('A', 0)} outside 25-35"
     )
-    assert 18 <= by_type.get("B", 0) <= 22, (
-        f"Type B count {by_type.get('B', 0)} outside 18-22"
+    assert by_type.get("B", 0) >= 200, (
+        f"Type B count {by_type.get('B', 0)} below 200 (T31 scale-up target)"
     )
-    assert 12 <= by_type.get("C", 0) <= 15, (
-        f"Type C count {by_type.get('C', 0)} outside 12-15"
+    assert by_type.get("C", 0) >= 80, (
+        f"Type C count {by_type.get('C', 0)} below 80 (T31 scale-up target)"
     )
-    assert 10 <= by_type.get("D", 0) <= 15, (
-        f"Type D count {by_type.get('D', 0)} outside 10-15"
+    assert by_type.get("D", 0) >= 60, (
+        f"Type D count {by_type.get('D', 0)} below 60 (T31 scale-up target)"
     )
 
 
@@ -270,19 +275,18 @@ def test_real_adsb_cards_have_access_date(all_cards: list[TaskCard]) -> None:
 
 
 def test_bcd_real_adsb_share(all_cards: list[TaskCard]) -> None:
-    """At least 60% of Type B, C, D cards must cite a real ADS-B Exchange file + timestamp."""
+    """At least 80% of Type B, C, D cards must cite a real ADS-B Exchange file + timestamp."""
     bcd_cards = [c for c in all_cards if c.task_type in ("B", "C", "D")]
     assert bcd_cards, "No B/C/D cards found"
     real_count = sum(
         1 for c in bcd_cards
         if c.provenance.source != "SYNTHETIC"
-        and "acas_" in c.provenance.source or "operations_" in c.provenance.source
-        or "ADS-B Exchange" in c.provenance.source
+        and "ADS-B Exchange" in c.provenance.source
     )
     real_pct = real_count / len(bcd_cards)
-    assert real_pct >= 0.60, (
+    assert real_pct >= 0.80, (
         f"Only {real_pct:.1%} of B/C/D cards cite real ADS-B Exchange data; "
-        f"expected >=60% (got {real_count}/{len(bcd_cards)})"
+        f"expected >=80% (got {real_count}/{len(bcd_cards)})"
     )
 
 
@@ -327,16 +331,17 @@ def test_critical_severity_escalation_rate(all_cards: list[TaskCard]) -> None:
 
 
 def test_type_d_references_separation_calculator(all_cards: list[TaskCard]) -> None:
-    """Every Type D card must reference separation_calculator in evidence_requirements."""
+    """Every Type D card must reference separation_calculator or wake_category_checker in evidence_requirements."""
     type_d_cards = [c for c in all_cards if c.task_type == "D"]
     assert type_d_cards, "No Type D cards found"
     for card in type_d_cards:
         has_ref = any(
-            "separation_calculator" in req for req in card.evidence_requirements
+            "separation_calculator" in req or "wake_category_checker" in req
+            for req in card.evidence_requirements
         )
         assert has_ref, (
             f"task_id={card.task_id}: Type D card must reference 'separation_calculator' "
-            f"in evidence_requirements (per T18 brief: Type D must use this tool)"
+            f"or 'wake_category_checker' in evidence_requirements"
         )
 
 
@@ -349,10 +354,12 @@ def test_type_d_generation_rules_mention_tool_inputs(all_cards: list[TaskCard]) 
             "separation_calculator" in rule
             or "lat" in rule.lower()
             or "lon" in rule.lower()
+            or "wake_category_checker" in rule
         )
         assert has_tool_args, (
             f"task_id={card.task_id}: Type D generation_rule should include "
-            f"tool call argument details (lat/lon coordinates for separation_calculator)"
+            f"tool call argument details (lat/lon for separation_calculator, "
+            f"or type codes for wake_category_checker)"
         )
 
 
@@ -362,7 +369,7 @@ def test_type_d_generation_rules_mention_tool_inputs(all_cards: list[TaskCard]) 
 
 
 def test_type_b_mentions_trajectory_generation(all_cards: list[TaskCard]) -> None:
-    """Every Type B card's generation_rule must mention trajectory generation method."""
+    """Every Type B card's generation_rule must mention trajectory or snapshot method."""
     type_b_cards = [c for c in all_cards if c.task_type == "B"]
     assert type_b_cards, "No Type B cards found"
     for card in type_b_cards:
@@ -371,10 +378,15 @@ def test_type_b_mentions_trajectory_generation(all_cards: list[TaskCard]) -> Non
             "straight-line" in rule.lower()
             or "constant-altitude" in rule.lower()
             or "trajectory" in rule.lower()
+            or "snapshot" in rule.lower()
+            or "nearest-in-time" in rule.lower()
+            or "event" in rule.lower()
+            or "in-trail" in rule.lower()
+            or "interval" in rule.lower()
         )
         assert has_trajectory, (
             f"task_id={card.task_id}: Type B generation_rule must describe "
-            f"trajectory generation method (e.g., 'straight-line constant-altitude tracks')"
+            f"trajectory/snapshot generation method"
         )
 
 
@@ -404,3 +416,95 @@ def test_print_summary(all_cards: list[TaskCard]) -> None:
     print(f"Escalation required: {escalation_count} ({escalation_count/len(all_cards):.1%})")
     critical_high = sum(1 for c in all_cards if c.severity in ("Critical", "High"))
     print(f"Critical+High: {critical_high} ({critical_high/len(all_cards):.1%})")
+
+
+# ---------------------------------------------------------------------------
+# T31 F6 scale-up tests (new per task brief)
+# ---------------------------------------------------------------------------
+
+
+def test_unique_acas_event_per_card(all_cards: list[TaskCard]) -> None:
+    """No single ACAS event (identified by file + hex pair) may be cited in more than 3 cards."""
+    import re
+    from collections import Counter
+
+    event_usage: Counter = Counter()
+    for card in all_cards:
+        src = card.provenance.source or ""
+        fname = None
+        for candidate in ("acas_20241201", "acas_20240101"):
+            if candidate in src:
+                fname = candidate
+                break
+        if not fname:
+            continue
+        # Bilateral: 'aircraft hex A and B'
+        m = re.search(r"aircraft hex ([0-9a-f]+) and ([0-9a-f]+)", src)
+        if m:
+            event_key = (fname, tuple(sorted([m.group(1), m.group(2)])))
+            event_usage[event_key] += 1
+            continue
+        # Unilateral: 'aircraft hex A ... intruder hex B'
+        m2 = re.search(r"aircraft hex ([0-9a-f]+).*?intruder hex ([0-9a-f]+)", src)
+        if m2:
+            event_key = (fname, tuple(sorted([m2.group(1), m2.group(2)])))
+            event_usage[event_key] += 1
+
+    violations = {k: v for k, v in event_usage.items() if v > 3}
+    assert not violations, (
+        f"ACAS events cited in more than 3 cards (hard rule: ≤3 per event): "
+        f"{list(violations.items())[:5]}"
+    )
+
+
+def test_distance_claims_verified(all_cards: list[TaskCard]) -> None:
+    """Sample 10 ATC2-B/C/D cards with haversine distance claims and recompute within 0.05 NM."""
+    import math
+    import re
+    import random
+
+    EARTH_RADIUS_NM = 3440.065
+
+    def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        phi1, phi2 = math.radians(lat1), math.radians(lat2)
+        dphi = math.radians(lat2 - lat1)
+        dlambda = math.radians(lon2 - lon1)
+        a = (math.sin(dphi / 2) ** 2
+             + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return EARTH_RADIUS_NM * c
+
+    # Cards with verifiable haversine claims
+    _DIST_PAT = re.compile(
+        r"separation_calculator\(([\d.\-]+),\s*([\d.\-]+),\s*([\d.\-]+),\s*([\d.\-]+)\)"
+        r"\s*[→\-\>]+\s*([\d.]+)\s*NM"
+    )
+
+    verifiable = []
+    for card in all_cards:
+        if not card.task_id.startswith("ATC2-"):
+            continue
+        for req in card.evidence_requirements:
+            m = _DIST_PAT.search(req)
+            if m:
+                verifiable.append((card.task_id, float(m.group(1)), float(m.group(2)),
+                                   float(m.group(3)), float(m.group(4)), float(m.group(5))))
+                break
+
+    assert verifiable, "No ATC2 cards found with haversine distance claims in evidence_requirements"
+
+    sample = verifiable[:10] if len(verifiable) >= 10 else verifiable
+    errors = []
+    for tid, lat1, lon1, lat2, lon2, claimed in sample:
+        computed = haversine_nm(lat1, lon1, lat2, lon2)
+        diff = abs(claimed - computed)
+        if diff > 0.05:
+            errors.append(
+                f"task_id={tid}: claimed={claimed:.4f} NM, recomputed={computed:.4f} NM, "
+                f"diff={diff:.4f} NM (exceeds 0.05 NM tolerance)"
+            )
+
+    assert not errors, (
+        f"Haversine distance claim verification failed for {len(errors)} card(s):\n"
+        + "\n".join(errors)
+    )
