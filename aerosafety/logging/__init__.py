@@ -15,6 +15,6 @@ Usage:
         el.log_trace(agent_trace)
 """
 
-from aerosafety.logging.logger import ExperimentLogger, get_logger
+from aerosafety.logging.logger import ExperimentLogger, RunIdMismatchError, get_logger
 
-__all__ = ["ExperimentLogger", "get_logger"]
+__all__ = ["ExperimentLogger", "RunIdMismatchError", "get_logger"]

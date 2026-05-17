@@ -173,10 +173,12 @@ def mixed_effects_logistic_spec() -> dict:
             "model_id",      # random effect grouping
             "task_id",       # random effect grouping
         ],
+        "data_library": "polars",
         "statsmodels_class": "statsmodels.formula.api.mixedlm or BinomialBayesMixedGLM",
         "note": (
             "PARTIAL IMPLEMENTATION: formula and spec are defined. "
-            "Fit with statsmodels when data is available."
+            "Build the polars DataFrame from EvalView records, convert to numpy/pandas "
+            "only at the statsmodels boundary. Fit with statsmodels when data is available."
         ),
     }
 

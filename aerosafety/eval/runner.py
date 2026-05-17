@@ -188,7 +188,7 @@ class EvalRunner:
         )
 
         run_metadata = {
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "n_tasks": len(traces),
             "n_bootstrap": self.n_bootstrap,
             "bootstrap_seed": self.bootstrap_seed,

@@ -64,11 +64,14 @@ class BM25Retriever(Retriever):
             ) from exc
 
         self._corpus = corpus
-        tokenized = [text.lower().split() for _, _, text in corpus]
-        self._bm25 = BM25Okapi(tokenized)
+        if corpus:
+            tokenized = [text.lower().split() for _, _, text in corpus]
+            self._bm25: "BM25Okapi | None" = BM25Okapi(tokenized)
+        else:
+            self._bm25 = None
 
     def retrieve(self, query: str, top_k: int = 5) -> list[RetrievedDoc]:
-        if not self._corpus:
+        if not self._corpus or self._bm25 is None:
             return []
         scores = self._bm25.get_scores(query.lower().split())
         ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)

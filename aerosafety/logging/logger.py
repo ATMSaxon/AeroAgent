@@ -24,6 +24,14 @@ from aerosafety.io import AgentTrace
 
 
 # ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class RunIdMismatchError(ValueError):
+    """Raised when a trace's run_id does not match the ExperimentLogger's run_id."""
+
+
+# ---------------------------------------------------------------------------
 # Standard Python logger (text console output)
 # ---------------------------------------------------------------------------
 
@@ -131,11 +139,15 @@ class ExperimentLogger:
         """
         Serialise one AgentTrace to a JSONL line.
 
-        Raises immediately on any write error (CLAUDE.md §8.1).
+        Raises immediately on any write error or run_id mismatch (CLAUDE.md §8.1).
         """
         if self._file is None:
             raise RuntimeError(
                 "ExperimentLogger is not open. Use it as a context manager."
+            )
+        if trace.run_id != self.run_id:
+            raise RunIdMismatchError(
+                f"logger run_id {self.run_id!r} does not match trace run_id {trace.run_id!r}"
             )
         record = {
             "run_id": self.run_id,
