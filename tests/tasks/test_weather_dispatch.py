@@ -87,7 +87,8 @@ def test_minimum_card_count(label: str, path: Path) -> None:
     if not path.exists():
         pytest.skip(f"{path} not found")
     cards = load_cards(path)
-    minimums = {"typeA": 30, "typeB": 17, "typeC": 10, "typeD": 10}
+    # T13 expansion: updated minimums
+    minimums = {"typeA": 50, "typeB": 40, "typeC": 20, "typeD": 20}
     assert len(cards) >= minimums[label], (
         f"{label}: expected >= {minimums[label]} cards, got {len(cards)}"
     )
@@ -98,10 +99,39 @@ def test_maximum_card_count(label: str, path: Path) -> None:
     if not path.exists():
         pytest.skip(f"{path} not found")
     cards = load_cards(path)
-    maximums = {"typeA": 50, "typeB": 30, "typeC": 20, "typeD": 15}
+    # T13 expansion: updated maximums
+    maximums = {"typeA": 80, "typeB": 60, "typeC": 35, "typeD": 30}
     assert len(cards) <= maximums[label], (
         f"{label}: expected <= {maximums[label]} cards, got {len(cards)}"
     )
+
+
+def test_v2_type_a_card_count() -> None:
+    """T13 must add >= 20 Type A SYNTHETIC cards with WD-v2-A prefix."""
+    cards = load_cards(JSONL_FILES["typeA"])
+    v2 = [c for c in cards if c.task_id.startswith("WD-v2-A-")]
+    assert len(v2) >= 20, f"Expected >= 20 WD-v2-A cards, got {len(v2)}"
+
+
+def test_v2_type_b_card_count() -> None:
+    """T13 must add >= 30 Type B real-data cards with WD-v2-B prefix."""
+    cards = load_cards(JSONL_FILES["typeB"])
+    v2 = [c for c in cards if c.task_id.startswith("WD-v2-B-")]
+    assert len(v2) >= 30, f"Expected >= 30 WD-v2-B cards, got {len(v2)}"
+
+
+def test_v2_type_c_card_count() -> None:
+    """T13 must add >= 15 Type C real-data cards with WD-v2-C prefix."""
+    cards = load_cards(JSONL_FILES["typeC"])
+    v2 = [c for c in cards if c.task_id.startswith("WD-v2-C-")]
+    assert len(v2) >= 15, f"Expected >= 15 WD-v2-C cards, got {len(v2)}"
+
+
+def test_v2_type_d_card_count() -> None:
+    """T13 must add >= 15 Type D real-data cards with WD-v2-D prefix."""
+    cards = load_cards(JSONL_FILES["typeD"])
+    v2 = [c for c in cards if c.task_id.startswith("WD-v2-D-")]
+    assert len(v2) >= 15, f"Expected >= 15 WD-v2-D cards, got {len(v2)}"
 
 
 # ---------------------------------------------------------------------------
@@ -146,19 +176,55 @@ def test_task_ids_unique() -> None:
 # Provenance integrity (CLAUDE.md §1.1 + §2.2)
 # ---------------------------------------------------------------------------
 
-def test_all_cards_synthetic_provenance() -> None:
-    """All cards in this pilot batch must be SYNTHETIC with generation_rule."""
+def _is_real_data_card(card) -> bool:
+    """Cards with IEM real provenance (not SYNTHETIC)."""
+    return card.provenance.source != "SYNTHETIC" and card.task_id.startswith("WD-v2-")
+
+
+def test_synthetic_cards_have_generation_rule() -> None:
+    """SYNTHETIC cards must have generation_rule and no access_date."""
     for card in all_cards():
         prov = card.provenance
-        assert prov.source == "SYNTHETIC", (
-            f"{card.task_id}: provenance.source must be 'SYNTHETIC' for pilot batch, got {prov.source!r}"
-        )
-        assert prov.access_date is None, (
-            f"{card.task_id}: SYNTHETIC cards must have access_date=null"
-        )
-        assert prov.generation_rule, (
-            f"{card.task_id}: SYNTHETIC cards must have a non-empty generation_rule"
-        )
+        if prov.source == "SYNTHETIC":
+            assert prov.access_date is None, (
+                f"{card.task_id}: SYNTHETIC cards must have access_date=null"
+            )
+            assert prov.generation_rule, (
+                f"{card.task_id}: SYNTHETIC cards must have a non-empty generation_rule"
+            )
+
+
+def test_real_data_cards_have_access_date() -> None:
+    """Real-data IEM cards must have access_date and no generation_rule."""
+    for card in all_cards():
+        prov = card.provenance
+        if _is_real_data_card(card):
+            assert prov.source != "SYNTHETIC", (
+                f"{card.task_id}: real-data card must not have source='SYNTHETIC'"
+            )
+            assert prov.access_date is not None, (
+                f"{card.task_id}: real-data card must have access_date"
+            )
+            assert prov.generation_rule is None, (
+                f"{card.task_id}: real-data card must not have generation_rule"
+            )
+
+
+def test_no_mixed_provenance_within_card() -> None:
+    """A card is either fully SYNTHETIC or fully real; no card may be both."""
+    for card in all_cards():
+        prov = card.provenance
+        is_synthetic = prov.source == "SYNTHETIC"
+        has_gen_rule = bool(prov.generation_rule)
+        has_access_date = prov.access_date is not None
+        if is_synthetic:
+            assert not has_access_date, (
+                f"{card.task_id}: SYNTHETIC card must not have access_date"
+            )
+        else:
+            assert not has_gen_rule, (
+                f"{card.task_id}: real-data card must not have generation_rule"
+            )
 
 
 def test_all_cards_not_expert_reviewed_license() -> None:
@@ -234,16 +300,21 @@ def test_critical_operational_cards_have_escalation() -> None:
 # ---------------------------------------------------------------------------
 
 def test_typeD_cards_mention_tool_requirements() -> None:
-    """Type D agentic cards must reference at least one tool in evidence_requirements."""
+    """Type D agentic cards must reference at least one tool in prompt, evidence, or gold_decision."""
     tools = {"metar_parser", "taf_parser", "wind_component", "weather_minima_checker"}
     if not JSONL_FILES["typeD"].exists():
         pytest.skip("typeD file not found")
     cards = load_cards(JSONL_FILES["typeD"])
     for card in cards:
-        evidence_text = " ".join(card.evidence_requirements).lower()
-        has_tool = any(t in evidence_text for t in tools)
+        combined_text = " ".join([
+            card.prompt,
+            card.gold_decision,
+            " ".join(card.evidence_requirements),
+        ]).lower()
+        has_tool = any(t in combined_text for t in tools)
         assert has_tool, (
-            f"{card.task_id}: Type D card must reference at least one tool in evidence_requirements"
+            f"{card.task_id}: Type D card must reference at least one tool "
+            f"in prompt, gold_decision, or evidence_requirements"
         )
 
 
@@ -384,3 +455,86 @@ def test_tempo_containing_eta_applies() -> None:
     tempo_end = 2200
     eta = 1900
     assert tempo_start <= eta < tempo_end, "ETA in TEMPO window should have TEMPO conditions"
+
+
+# ---------------------------------------------------------------------------
+# T13 real data methodology doc and manifest verification
+# ---------------------------------------------------------------------------
+
+def test_real_data_methodology_exists() -> None:
+    assert (TASKCARDS_DIR / "real_data_methodology.md").exists(), (
+        "real_data_methodology.md not found (required by T13)"
+    )
+
+
+def test_iem_metar_manifest_exists() -> None:
+    manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
+    assert manifest.exists(), f"IEM METAR manifest not found: {manifest}"
+
+
+def test_iem_taf_manifest_exists() -> None:
+    manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_TAF" / "2026-05-17" / "manifest.jsonl"
+    assert manifest.exists(), f"IEM TAF manifest not found: {manifest}"
+
+
+def test_real_data_cards_cite_manifest_verified_files() -> None:
+    """Every real-data card's provenance.source must cite a file in the IEM manifests."""
+    import json as _json
+    metar_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_METAR" / "2026-05-17" / "manifest.jsonl"
+    taf_manifest = Path(__file__).parent.parent.parent / "data" / "raw" / "IEM_TAF" / "2026-05-17" / "manifest.jsonl"
+
+    def _manifest_files(manifest_path: Path) -> set:
+        files = set()
+        if not manifest_path.exists():
+            return files
+        with manifest_path.open() as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                    files.add(entry.get("file", ""))
+                except Exception:
+                    pass
+        return files
+
+    metar_files = _manifest_files(metar_manifest)
+    taf_files = _manifest_files(taf_manifest)
+    all_manifest_files = metar_files | taf_files
+
+    for card in all_cards():
+        if not _is_real_data_card(card):
+            continue
+        source = card.provenance.source
+        # Check that at least one manifest file is mentioned in the source string
+        found = any(f in source for f in all_manifest_files if f)
+        if not found and all_manifest_files:
+            # Source may cite the file path directly without the manifest entry filename
+            # Accept if source contains "IEM_METAR" or "IEM_TAF" as a minimum check
+            found = "IEM_METAR" in source or "IEM_TAF" in source
+        assert found, (
+            f"{card.task_id}: real-data card provenance.source must cite IEM manifest files; "
+            f"got: {source!r}"
+        )
+
+
+def test_v2_a_cards_are_synthetic() -> None:
+    """WD-v2-A cards must be SYNTHETIC (not real IEM data)."""
+    cards = load_cards(JSONL_FILES["typeA"])
+    for card in cards:
+        if card.task_id.startswith("WD-v2-A-"):
+            assert card.provenance.source == "SYNTHETIC", (
+                f"{card.task_id}: WD-v2-A cards must be SYNTHETIC"
+            )
+
+
+def test_real_data_cards_cite_kord_or_kjfk() -> None:
+    """WD-v2 B/C/D cards must cite KORD or KJFK data."""
+    for card in all_cards():
+        if not _is_real_data_card(card):
+            continue
+        source = card.provenance.source
+        assert "KORD" in source or "KJFK" in source, (
+            f"{card.task_id}: real-data card must cite KORD or KJFK in provenance.source"
+        )

@@ -25,12 +25,16 @@ EXPECTED_TOOL_NAMES = {
     "get_wake_category",
     "check_mel",
     "check_weather_minima",
+    "optimization_solver",
 }
+
+# Tools explicitly marked mock=True (PARTIAL or MOCK IMPLEMENTATION per CLAUDE.md §1.2)
+MOCK_TOOLS = {"check_mel", "optimization_solver"}
 
 
 class TestRegistryContents:
     def test_all_tools_registered(self):
-        """All 10 tools must be present."""
+        """All 11 tools must be present."""
         names = {t.name for t in list_tools()}
         assert EXPECTED_TOOL_NAMES == names
 
@@ -60,10 +64,10 @@ class TestRegistryContents:
         mel = get_tool("check_mel")
         assert mel.mock is True
 
-    def test_non_mel_tools_not_mock(self):
-        """Real tools must not be marked as mock."""
+    def test_non_mock_tools_not_mock(self):
+        """Tools not in MOCK_TOOLS must not be marked as mock."""
         for tool in list_tools():
-            if tool.name != "check_mel":
+            if tool.name not in MOCK_TOOLS:
                 assert tool.mock is False, f"'{tool.name}' should not be marked mock"
 
     def test_get_tool_known_name(self):
@@ -77,9 +81,9 @@ class TestRegistryContents:
 
 class TestOpenAIExport:
     def test_openai_format_length(self):
-        """All 10 tools exported."""
+        """All 11 tools exported."""
         exported = to_openai_functions()
-        assert len(exported) == 10
+        assert len(exported) == 11
 
     def test_openai_format_structure(self):
         """Each entry must have type='function' and 'function' key."""
@@ -99,7 +103,7 @@ class TestOpenAIExport:
 class TestAnthropicExport:
     def test_anthropic_format_length(self):
         exported = to_anthropic_tools()
-        assert len(exported) == 10
+        assert len(exported) == 11
 
     def test_anthropic_format_structure(self):
         """Each entry must have name, description, input_schema."""
