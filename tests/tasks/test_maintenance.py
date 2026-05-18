@@ -273,8 +273,13 @@ def test_synthetic_cards_have_no_access_date(all_cards: list[TaskCard]) -> None:
 
 
 REAL_SOURCE_PREFIXES = ("NTSB accident report", "CAROL case")
+# F8 SYNTHETIC B/C/D cards must explain why no real-data anchor is used.
+# Acceptable explanations: (1) the original MEL proprietary justification
+# from T27; (2) the 2026-05-18 audit reclassification from NTSB-orphan to
+# pure synthetic (cards that originally cited unverifiable NTSB IDs and
+# were rewritten to remove the false-real claim).
 SYNTHETIC_PROVENANCE_NOTE = (
-    "SYNTHETIC: real MEL is operator-specific and proprietary (FAA Order 8900.1)"
+    "real MEL is operator-specific and proprietary"  # substring match
 )
 
 MANIFEST_NTSB_IDS = {

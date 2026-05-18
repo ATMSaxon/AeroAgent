@@ -333,9 +333,18 @@ def test_synthetic_cards_have_generation_rule():
 
 
 def test_real_data_cards_no_generation_rule():
-    """Real-data cards must NOT have a generation_rule (mutually exclusive with SYNTHETIC)."""
+    """Real-data cards (provenance_class='real') must NOT have a generation_rule.
+    Hybrid and synthetic cards MAY have one (they declare it explicitly)."""
     cards = _load_all_cards()
     for card in cards:
+        # Skip cards whose source starts with "SYNTHETIC" (audit-reclassified
+        # NTSB-orphan cards) and any card declared synthetic or hybrid.
+        src = (card.provenance.source or "")
+        if src.strip().upper().startswith("SYNTHETIC"):
+            continue
+        cls = getattr(card, "provenance_class", None)
+        if cls in ("synthetic", "hybrid"):
+            continue
         if card.provenance.source != "SYNTHETIC":
             assert card.provenance.generation_rule is None, (
                 f"task_id={card.task_id} is real-data but has a generation_rule set"
