@@ -133,8 +133,10 @@ class TaskProvenance(BaseModel):
     access_date: str | None = None   # ISO-8601 date; None iff source == "SYNTHETIC"
     # Required when source == "SYNTHETIC"
     generation_rule: str | None = None
-    # License/data-use notes
+    # License/data-use notes (actual data license, not review state)
     license: str | None = None
+    # Review state (separate from license — added round-2 audit fix 2026-05-18)
+    review_status: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -197,8 +199,16 @@ class TaskCard(BaseModel):
     # Data provenance — mandatory; no task without a provenance record
     provenance: TaskProvenance
 
-    # Optional split tag
-    split: Literal["dev", "test"] | None = None
+    # Optional split tag — `provisional_test` is the honest tag for cards
+    # intended for the frozen test split but not yet expert-reviewed (per
+    # docs/expert_review_protocol.md §8 and the 2026-05-18 round-2 audit).
+    # Cards promote from provisional_test → test when expert review completes.
+    split: Literal["dev", "test", "provisional_test"] | None = None
+
+    # Provenance class — `real` (cite real source, no generation_rule),
+    # `synthetic` (no real anchor), or `hybrid` (real anchor + synthetic
+    # scenario layer). Always recomputable from provenance fields.
+    provenance_class: Literal["real", "synthetic", "hybrid"] | None = None
 
     # Multimodal attachments — empty list for text-only tasks (backward compat)
     attachments: list[MultimodalAttachment] = Field(default_factory=list)

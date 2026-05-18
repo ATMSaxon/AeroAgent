@@ -39,10 +39,28 @@ TASKS_DIR = ROOT / "aerosafety" / "tasks"
 RAW_DIR = ROOT / "data" / "raw"
 
 ALLOWED_LICENSE_PATTERNS = (
-    "PILOT — NOT EXPERT-REVIEWED",
+    # Real-content licenses (substring match)
     "U.S. Government public domain",
-    "ICAO public",
-    "EUROCONTROL public",
+    "Iowa State Environmental Mesonet",
+    "ADS-B Exchange",
+    "OR-Library",
+    "BTS On-Time",
+    "RECAT-EU",
+    "FAA",
+    "ICAO",
+    "EUROCONTROL",
+    "NTSB",
+    "IEM",
+    # SYNTHETIC content licenses (synthesised from public rules — no copyright)
+    "SYNTHETIC — no copyright",
+    "SYNTHETIC; no copyright",
+)
+
+# review_status field (separate from license — review state, not licensing)
+ALLOWED_REVIEW_STATUSES = (
+    "PILOT — NOT EXPERT-REVIEWED",
+    "EXPERT-REVIEWED",
+    "ADJUDICATED",
 )
 
 # Identifier extraction patterns for C5 split-leakage check.
@@ -62,6 +80,16 @@ LEAKAGE_PATTERNS = [
     ("ADSB_FILE", re.compile(r"\b((?:flights|operations|acas)_\d{8}(?:\.csv|\.csv\.gz)?)\b")),
     ("IEM_STATION_MONTH", re.compile(r"\b((?:K[A-Z]{3}|P[A-Z]{3}|[A-Z]{4})_(?:METAR|TAF)_\d{6})\b")),
     ("BTS_ZIP", re.compile(r"\b(On_Time_Reporting_Carrier_On_Time_Performance_\d+_present_\d{4}_\d{2})")),
+    ("BTS_ZIP_SHORT", re.compile(r"\b(BTS_OnTime_\d{4}_\d{2})")),
+    # Event-level: airport (3-or-4 letter) + date in either order. The K-prefix
+    # is normalized away in _extract_ids so EWR and KEWR collapse to the same id.
+    ("AIRPORT_DATE", re.compile(r"\b(K?[A-Z]{3})[\s,]+20(\d{2}-\d{2}-\d{2})\b")),
+    ("DATE_AIRPORT", re.compile(r"\b20(\d{2}-\d{2}-\d{2})[\s,]+(K?[A-Z]{3})\b")),
+    ("ISO_DATE_HHMM", re.compile(r"\b(20\d{2}-\d{2}-\d{2}T?\s?\d{2}:?\d{2}Z?)\b")),
+    # # EVENT_LEAK_PATTERNS_ADDED_2026_05_18 — same-day same-airport event collisions catch BTS GDP / ADS-B reuse
+    ("AIRPORT_DATE_EVENT", re.compile(r"\b(K[A-Z]{3}|P[A-Z]{3})\s+(20\d{2}-\d{2}-\d{2})\b")),
+    ("DATE_AIRPORT_EVENT", re.compile(r"\b(20\d{2}-\d{2}-\d{2})\s+(K[A-Z]{3}|P[A-Z]{3})\b")),
+    ("ISO_DATE_HHMM", re.compile(r"\b(20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}Z?)\b")),
 ]
 
 
@@ -111,9 +139,13 @@ def _load_ntsb_ids() -> set[str]:
 
 
 def _provenance_class_of(card: dict) -> str:
-    """Classify a card as 'real' | 'synthetic' | 'hybrid'."""
-    if "provenance_class" in card and card["provenance_class"] in {"real", "synthetic", "hybrid"}:
-        return card["provenance_class"]
+    """Classify a card as 'real' | 'synthetic' | 'hybrid'.
+
+    Always recomputed from provenance.source + generation_rule; the
+    declared `provenance_class` field on the card is IGNORED here to
+    avoid trusting a future mislabel. C3 separately compares declared
+    vs computed and flags discrepancies.
+    """
     prov = card.get("provenance") or {}
     source = (prov.get("source") or "").upper()
     has_rule = bool(prov.get("generation_rule"))
@@ -139,7 +171,17 @@ def _extract_ids(text: str) -> dict[str, set[str]]:
     out: dict[str, set[str]] = defaultdict(set)
     for label, pat in LEAKAGE_PATTERNS:
         for m in pat.finditer(text or ""):
-            out[label].add(m.group(0))
+            # Normalize event-level identifiers: airport (drop K prefix) + date
+            if label in ("AIRPORT_DATE", "DATE_AIRPORT") and m.lastindex == 2:
+                if label == "AIRPORT_DATE":
+                    airport, date = m.group(1), m.group(2)
+                else:
+                    date, airport = m.group(1), m.group(2)
+                norm_airport = airport.lstrip("K") if airport.startswith("K") and len(airport) == 4 else airport
+                norm = f"{norm_airport}@20{date}"
+                out["AIRPORT_DATE_EVENT"].add(norm)
+            else:
+                out[label].add(m.group(0))
     return out
 
 
@@ -216,20 +258,26 @@ def run_audit() -> int:
             f"(manifest has {len(ntsb_manifest_ids)} known IDs), sample: {ntsb_orphans[:5]}"
         )
 
-    # C5 — split leakage: same identifier in both dev and test
+    # C5 — split leakage: same identifier in both dev and (provisional_)test
+    # Treat 'provisional_test' identically to 'test' — it's the same split, just
+    # honestly labelled until expert review completes.
+    EVAL_SPLITS = {"test", "provisional_test"}
     by_split_id: dict[tuple[str, str], dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for fam, c, f, i in cards:
         split = c.get("split")
-        if split not in ("dev", "test"):
+        if split not in (EVAL_SPLITS | {"dev"}):
             continue
+        canonical_split = "test" if split in EVAL_SPLITS else split
         source = c.get("provenance", {}).get("source", "") or ""
         # Also scan attachments' provenance for identifiers (multimodal)
         for att in c.get("attachments") or []:
             ap = (att.get("provenance") or {}).get("source", "") or ""
             source = source + " " + ap + " " + (att.get("file_path") or "")
+        # Also include prompt + gold_decision text — semantic leakage detection
+        source = source + " " + (c.get("prompt") or "") + " " + (c.get("gold_decision") or "")
         for label, ids in _extract_ids(source).items():
             for ident in ids:
-                by_split_id[(label, ident)][split].append(c["task_id"])
+                by_split_id[(label, ident)][canonical_split].append(c["task_id"])
     leaks: list[str] = []
     for (label, ident), splits in by_split_id.items():
         if "dev" in splits and "test" in splits:
@@ -257,6 +305,34 @@ def run_audit() -> int:
             f"C6 license string anomalies: {len(bad_licenses)} cards, sample: {bad_licenses[:5]}"
         )
 
+    # C7 — review_status field present and valid (added round-2)
+    bad_review: list[str] = []
+    for fam, c, f, i in cards:
+        rs = (c.get("provenance") or {}).get("review_status") or ""
+        if not rs:
+            bad_review.append(f"{c['task_id']} missing review_status")
+            continue
+        if not any(p in rs for p in ALLOWED_REVIEW_STATUSES):
+            bad_review.append(f"{c['task_id']} unrecognised review_status: {rs!r}")
+    if bad_review:
+        failures.append(
+            f"C7 review_status anomalies: {len(bad_review)} cards, sample: {bad_review[:5]}"
+        )
+
+    # C8 — no card may be in frozen `test` split until expert review completes.
+    # Until then, provisional_test is the honest tag (matches protocol §8).
+    bad_split: list[str] = []
+    for fam, c, f, i in cards:
+        if c.get("split") == "test":
+            rs = (c.get("provenance") or {}).get("review_status") or ""
+            if "EXPERT-REVIEWED" not in rs and "ADJUDICATED" not in rs:
+                bad_split.append(f"{c['task_id']} in frozen test without expert review")
+    if bad_split:
+        failures.append(
+            f"C8 frozen-test admission without expert review: {len(bad_split)} cards, "
+            f"sample: {bad_split[:5]}"
+        )
+
     print("=" * 70)
     print("Contamination audit report")
     print("=" * 70)
@@ -267,6 +343,8 @@ def run_audit() -> int:
     print(f"NTSB orphan refs: {len(ntsb_orphans)}")
     print(f"Cross-split leaks: {len(leaks)}")
     print(f"License anomalies: {len(bad_licenses)}")
+    print(f"Review-status anomalies: {len(bad_review)}")
+    print(f"Frozen-test-without-review: {len(bad_split)}")
     print()
     if failures:
         for failure in failures:

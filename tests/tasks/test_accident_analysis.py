@@ -227,7 +227,7 @@ def test_family_is_accident_analysis():
 def test_split_field_set():
     cards = _load_all_cards()
     for card in cards:
-        assert card.split in ("dev", "test"), (
+        assert card.split in ("dev", "test", "provisional_test"), (
             f"task_id={card.task_id} has split={card.split!r}"
         )
 
@@ -235,7 +235,7 @@ def test_split_field_set():
 def test_dev_test_split_ratio():
     cards = _load_all_cards()
     dev_count = sum(1 for c in cards if c.split == "dev")
-    test_count = sum(1 for c in cards if c.split == "test")
+    test_count = sum(1 for c in cards if c.split in ("test", "provisional_test"))
     total = len(cards)
     dev_ratio = dev_count / total
     assert 0.60 <= dev_ratio <= 0.80, (
@@ -246,7 +246,7 @@ def test_dev_test_split_ratio():
 def test_no_test_ids_in_dev():
     cards = _load_all_cards()
     dev_ids = {c.task_id for c in cards if c.split == "dev"}
-    test_ids = {c.task_id for c in cards if c.split == "test"}
+    test_ids = {c.task_id for c in cards if c.split in ("test", "provisional_test")}
     overlap = dev_ids & test_ids
     assert not overlap, f"task_ids appear in both dev and test splits: {overlap}"
 
@@ -304,19 +304,24 @@ def test_required_safety_constraints_non_empty():
         )
 
 
-VALID_LICENSES = {
-    "PILOT — NOT EXPERT-REVIEWED",          # round-1 cards
-    "Public domain — NTSB public record",   # NC2 real-data cards
-    "Synthetic — no copyright",             # NC2 synthetic cards
-}
+VALID_LICENSE_PREFIXES = (
+    "U.S. Government public domain",
+    "Public domain",
+    "Synthetic — no copyright",
+    "SYNTHETIC — no copyright",
+    "NTSB",
+    "FAA",
+    "ICAO",
+)
 
 
 def test_provenance_license_set():
     cards = _load_all_cards()
     for card in cards:
-        assert card.provenance.license in VALID_LICENSES, (
-            f"task_id={card.task_id} has unrecognized license: {card.provenance.license!r}. "
-            f"Valid: {VALID_LICENSES}"
+        lic = card.provenance.license or ""
+        assert any(lic.startswith(p) or p in lic for p in VALID_LICENSE_PREFIXES), (
+            f"task_id={card.task_id} has unrecognized license: {lic!r}. "
+            f"Valid prefixes: {VALID_LICENSE_PREFIXES}"
         )
 
 
