@@ -163,6 +163,14 @@ def _provenance_class_of(card: dict) -> str:
         # real-source + generation_rule → hybrid (scenario synthesised around real anchor)
         return "hybrid"
     if source:
+        # Round-3 categorical fix: Type B/C/D cards with real source are
+        # hybrid by definition (scenario decorating the real anchor —
+        # invented decision context, callsigns, hypothetical traffic).
+        # Only Type A (direct knowledge questions about real source
+        # content) can be pure 'real'. Codex round-3 audit identified
+        # this as the categorical inflator that produced 996 "real" cards.
+        if card.get("task_type") in ("B", "C", "D"):
+            return "hybrid"
         return "real"
     return "synthetic"
 
@@ -325,12 +333,50 @@ def run_audit() -> int:
     for fam, c, f, i in cards:
         if c.get("split") == "test":
             rs = (c.get("provenance") or {}).get("review_status") or ""
-            if "EXPERT-REVIEWED" not in rs and "ADJUDICATED" not in rs:
+            # Substring bug fix (round-3): "EXPERT-REVIEWED" appears inside
+            # "NOT EXPERT-REVIEWED"; use word-boundary match to detect actual
+            # expert review state.
+            rs_norm = re.sub(r"NOT\s+EXPERT-REVIEWED", "", rs)
+            if "EXPERT-REVIEWED" not in rs_norm and "ADJUDICATED" not in rs_norm:
                 bad_split.append(f"{c['task_id']} in frozen test without expert review")
     if bad_split:
         failures.append(
             f"C8 frozen-test admission without expert review: {len(bad_split)} cards, "
             f"sample: {bad_split[:5]}"
+        )
+
+    # C9 — duplicate failure_mode_labels within a single card's list
+    dup_labels: list[str] = []
+    for fam, c, f, i in cards:
+        lbls = c.get("failure_mode_labels", []) or []
+        if len(lbls) != len(set(lbls)):
+            dups = [x for x in lbls if lbls.count(x) > 1]
+            dup_labels.append(f"{c['task_id']} dup={sorted(set(dups))}")
+    if dup_labels:
+        failures.append(
+            f"C9 duplicate failure_mode_labels within card: {len(dup_labels)} cards, "
+            f"sample: {dup_labels[:5]}"
+        )
+
+    # C10 — identical gold_decision across dev and (provisional_)test
+    by_gold: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    for fam, c, f, i in cards:
+        sp = c.get("split")
+        if sp not in ("dev", "test", "provisional_test"):
+            continue
+        canon = "test" if sp in ("test", "provisional_test") else "dev"
+        gold = (c.get("gold_decision") or "").strip()
+        if len(gold) < 30:  # ignore trivial 1-word golds
+            continue
+        by_gold[gold][canon].append(c["task_id"])
+    dup_gold: list[str] = []
+    for gold, splits in by_gold.items():
+        if "dev" in splits and "test" in splits:
+            dup_gold.append(f"dev={splits['dev'][:2]} test={splits['test'][:2]} (gold {gold[:60]!r})")
+    if dup_gold:
+        failures.append(
+            f"C10 identical gold_decision across dev and (provisional_)test: "
+            f"{len(dup_gold)} duplicate gold groups, sample: {dup_gold[:5]}"
         )
 
     print("=" * 70)
