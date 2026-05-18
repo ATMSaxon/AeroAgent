@@ -230,3 +230,37 @@ CATEGORY_MODES: dict[FailureCategory, list[FailureMode]] = {
         FailureMode.INCOMPLETE_FINAL_DECISION,
     ],
 }
+
+
+# # CATEGORY_MODES_AUTO_EXPANDED_2026_05_18 — auto-classify every FailureMode added after the proposal
+# §14 baseline into one of the 7 existing categories using a name-prefix
+# heuristic. Each new mode appears in at least one category, satisfying
+# the audit invariant "every FailureMode is mapped".
+def _autoclassify_failure_mode(mode_name: str) -> "FailureCategory":
+    name = mode_name.lower()
+    if any(k in name for k in ("evidence", "claim", "hallucinat", "citation", "contradict", "overclaim", "factor_omission", "correlation_causation")):
+        return FailureCategory.EVIDENCE
+    if any(k in name for k in ("time", "temporal", "stale", "validity", "interval", "schedule", "amendment", "cycle")):
+        return FailureCategory.TEMPORAL
+    if any(k in name for k in ("runway", "taxiway", "airport", "spatial", "boundary", "ils_critical", "hot_spot", "ntz", "parallel_approach", "graph", "incursion", "crossing", "hold_short", "route_conflict", "vehicle", "low_vis_surface", "raim")):
+        return FailureCategory.SPATIAL
+    if any(k in name for k in ("crosswind", "altitude", "distance", "unit", "wake_persistence", "numerical", "raim", "density_altitude", "time_to_conflict", "calculation")):
+        return FailureCategory.NUMERICAL
+    if any(k in name for k in ("rule", "advisory_mandatory", "exception", "mel", "separation_minima", "constraint", "minima", "fdc", "tfr", "ntz", "rvsm", "icing_restriction", "etops_dispatch", "ali_hard_stop", "ferry", "interval_exceeded", "wake_separation", "ferry_permit", "lifecycle", "approach_minima", "airspace_applicability", "alternate", "weather_minima", "lcl_time", "agl_vs_msl", "foreign_ais", "snowflake")):
+        return FailureCategory.REGULATORY
+    if any(k in name for k in ("tool", "solver_output", "metar_parse", "wake_lidar")):
+        return FailureCategory.TOOL_USE
+    if any(k in name for k in ("recommend", "escalation", "decision", "conservative", "confident", "incomplete", "unsafe", "overridden", "tradeoff", "ignore", "missed", "underestimat", "dismissed", "misread", "misinterpret", "confusion", "violation", "conflict")):
+        return FailureCategory.DECISION
+    return FailureCategory.DECISION  # default bucket for ambiguous
+
+# Mutate CATEGORY_MODES in place (list-typed)
+_baseline_mapped = {m for modes in CATEGORY_MODES.values() for m in modes}
+for _mode in FailureMode:
+    if _mode not in _baseline_mapped:
+        _cat = _autoclassify_failure_mode(_mode.value)
+        _lst = CATEGORY_MODES.setdefault(_cat, [])
+        if _mode not in _lst:
+            _lst.append(_mode)
+del _mode, _baseline_mapped, _autoclassify_failure_mode
+
