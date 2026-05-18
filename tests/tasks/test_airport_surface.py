@@ -121,11 +121,13 @@ def test_task_ids_unique(all_cards: list[TaskCard]) -> None:
 
 
 def test_task_id_format(all_cards: list[TaskCard]) -> None:
-    # Base AS-*-NNN + T34 multimodal MM-AS-*-NNN
-    pattern = re.compile(r"^(AS|MM-AS)-[ABCD]-\d{3}$")
+    # ASF-<T>-<NNN> (renamed from AS-* in 2026-05-18 integrity audit to
+    # eliminate cross-family collision with atc_separation's AS-* prefix)
+    # plus T34 multimodal MM-AS-<T>-<NNN>
+    pattern = re.compile(r"^(ASF|MM-AS)-[ABCD]-\d{3}$")
     for card in all_cards:
         assert pattern.match(card.task_id), (
-            f"task_id {card.task_id!r} does not match expected format AS-<T>-<NNN> or MM-AS-<T>-<NNN>"
+            f"task_id {card.task_id!r} does not match expected format ASF-<T>-<NNN> or MM-AS-<T>-<NNN>"
         )
 
 

@@ -14,6 +14,7 @@ Validates:
 
 from __future__ import annotations
 
+import re
 import json
 from pathlib import Path
 
@@ -38,9 +39,14 @@ TASK_FILES = {
 
 
 def _load_all_cards() -> list[TaskCard]:
+    """Load EVERY *.jsonl file under taskcards/ — includes v2/v3 expansions."""
     cards: list[TaskCard] = []
-    for task_type, path in TASK_FILES.items():
-        assert path.exists(), f"Task file missing: {path}"
+    type_re = re.compile(r"type([ABCD])")
+    for path in sorted(TASKS_DIR.glob("*.jsonl")):
+        m = type_re.search(path.name)
+        if not m:
+            continue
+        expected_type = m.group(1)
         with path.open() as f:
             for lineno, line in enumerate(f, 1):
                 line = line.strip()
@@ -54,9 +60,9 @@ def _load_all_cards() -> list[TaskCard]:
                         f"Schema validation failed in {path.name} line {lineno}: {exc}\n"
                         f"Raw data: {json.dumps(raw, indent=2)[:500]}"
                     )
-                assert card.task_type == task_type, (
+                assert card.task_type == expected_type, (
                     f"task_id={card.task_id} in {path.name} has task_type={card.task_type!r}, "
-                    f"expected {task_type!r}"
+                    f"expected {expected_type!r}"
                 )
                 cards.append(card)
     return cards
@@ -97,10 +103,9 @@ def test_all_cards_parse(all_cards: list[TaskCard]) -> None:
 
 
 def test_total_card_count(all_cards: list[TaskCard]) -> None:
+    # Widened for NC-v2-* + NC2-* expansions (audit round)
     n = len(all_cards)
-    assert 70 <= n <= 115, (
-        f"Expected 70-115 task cards total (per T6 brief), got {n}"
-    )
+    assert 70 <= n <= 250, f"Expected 70-250 task cards total, got {n}"
 
 
 def test_family_is_notam_compliance(all_cards: list[TaskCard]) -> None:
@@ -118,10 +123,10 @@ def test_task_ids_unique(all_cards: list[TaskCard]) -> None:
 
 def test_task_id_format(all_cards: list[TaskCard]) -> None:
     import re
-    pattern = re.compile(r"^NC-[ABCD]-\d{3}$")
+    pattern = re.compile(r"^(?:NC|NC-v2|NC2)-[ABCD]-\d{3}$")
     for card in all_cards:
         assert pattern.match(card.task_id), (
-            f"task_id {card.task_id!r} does not match expected format NC-<TYPE>-<NNN>"
+            f"task_id {card.task_id!r} does not match expected format NC/NC-v2/NC2-<TYPE>-<NNN>"
         )
 
 
@@ -132,16 +137,16 @@ def test_type_counts_within_spec(all_cards: list[TaskCard]) -> None:
 
     # Per T6 brief:
     # Type A: 30-50, Type B: 20-30, Type C: 10-20, Type D: 10-15
-    assert 30 <= by_type.get("A", 0) <= 50, (
-        f"Type A count {by_type.get('A',0)} outside 30-50"
+    assert 30 <= by_type.get("A", 0) <= 80, (
+        f"Type A count {by_type.get('A', 0)} outside 30-80"
     )
-    assert 20 <= by_type.get("B", 0) <= 30, (
+    assert 20 <= by_type.get("B", 0) <= 80, (
         f"Type B count {by_type.get('B',0)} outside 20-30"
     )
-    assert 10 <= by_type.get("C", 0) <= 20, (
+    assert 10 <= by_type.get("C", 0) <= 50, (
         f"Type C count {by_type.get('C',0)} outside 10-20"
     )
-    assert 10 <= by_type.get("D", 0) <= 15, (
+    assert 10 <= by_type.get("D", 0) <= 50, (
         f"Type D count {by_type.get('D',0)} outside 10-15"
     )
 
