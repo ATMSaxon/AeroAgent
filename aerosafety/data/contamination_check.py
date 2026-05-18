@@ -379,6 +379,43 @@ def run_audit() -> int:
             f"{len(dup_gold)} duplicate gold groups, sample: {dup_gold[:5]}"
         )
 
+    # C11_C12_ADDED_2026_05_18
+    # C11 — content hash check on (prompt + gold_decision) across splits
+    import hashlib
+    content_hashes: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    for fam, c, f, i in cards:
+        sp = c.get("split")
+        if sp not in ("dev", "test", "provisional_test"):
+            continue
+        canon = "test" if sp in ("test", "provisional_test") else "dev"
+        content = (c.get("prompt") or "").strip() + " ||| " + (c.get("gold_decision") or "").strip()
+        if len(content) < 60:
+            continue
+        h = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        content_hashes[h][canon].append(c["task_id"])
+    dup_content: list[str] = []
+    for h, splits in content_hashes.items():
+        if "dev" in splits and "test" in splits:
+            dup_content.append(f"dev={splits['dev'][:2]} test={splits['test'][:2]}")
+    if dup_content:
+        failures.append(
+            f"C11 prompt+gold content-hash duplication across dev and "
+            f"(provisional_)test: {len(dup_content)} hashes, sample: {dup_content[:5]}"
+        )
+
+    # C12 — every hybrid card must have a non-empty generation_rule
+    bad_hybrid: list[str] = []
+    for fam, c, f, i in cards:
+        if (c.get("provenance_class") or _provenance_class_of(c)) != "hybrid":
+            continue
+        if not (c.get("provenance") or {}).get("generation_rule"):
+            bad_hybrid.append(c["task_id"])
+    if bad_hybrid:
+        failures.append(
+            f"C12 hybrid cards missing generation_rule: {len(bad_hybrid)} cards, "
+            f"sample: {bad_hybrid[:5]}"
+        )
+
     print("=" * 70)
     print("Contamination audit report")
     print("=" * 70)

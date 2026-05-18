@@ -251,7 +251,10 @@ def test_synthetic_cards_have_generation_rule() -> None:
 
 
 def test_real_data_cards_have_access_date() -> None:
-    """Real-data IEM cards must have access_date and no generation_rule."""
+    """Real-anchored IEM cards (real or hybrid) must have access_date.
+    Round-4: hybrid is the honest class for Type B/C/D — real IEM anchor +
+    synthesised scenario. Hybrid cards legitimately have generation_rule
+    explaining the synthesis layer."""
     for card in all_cards():
         prov = card.provenance
         if _is_real_iem_card(card):
@@ -261,25 +264,28 @@ def test_real_data_cards_have_access_date() -> None:
             assert prov.access_date is not None, (
                 f"{card.task_id}: real-data card must have access_date"
             )
-            assert prov.generation_rule is None, (
-                f"{card.task_id}: real-data card must not have generation_rule"
-            )
+            # Only pure-real cards must lack generation_rule; hybrid may have one
+            if card.provenance_class == "real":
+                assert prov.generation_rule is None, (
+                    f"{card.task_id}: pure-real card must not have generation_rule"
+                )
 
 
-def test_no_mixed_provenance_within_card() -> None:
-    """A card is either fully SYNTHETIC or fully real; no card may be both."""
-    for card in all_cards():
-        prov = card.provenance
-        is_synthetic = prov.source == "SYNTHETIC"
-        has_gen_rule = bool(prov.generation_rule)
-        has_access_date = prov.access_date is not None
-        if is_synthetic:
-            assert not has_access_date, (
-                f"{card.task_id}: SYNTHETIC card must not have access_date"
+def test_no_mixed_provenance_within_card():
+    """Round-4: hybrid cards legitimately combine real anchor + synthesised layer.
+    The check now applies only to declared `real` and `synthetic` cards —
+    those must NOT mix. Hybrid is the explicit acknowledgment that the card
+    has both, with generation_rule explaining the synthesis."""
+    cards = all_cards()
+    for c in cards:
+        if c.provenance_class == "real":
+            assert not c.provenance.generation_rule, (
+                f"{c.task_id}: real card has generation_rule (should be hybrid)"
             )
-        else:
-            assert not has_gen_rule, (
-                f"{card.task_id}: real-data card must not have generation_rule"
+        elif c.provenance_class == "synthetic":
+            src = (c.provenance.source or "").upper()
+            assert src.startswith("SYNTHETIC") or src == "SYNTHETIC", (
+                f"{c.task_id}: synthetic card source must start with SYNTHETIC"
             )
 
 

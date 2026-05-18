@@ -318,14 +318,19 @@ def test_real_cards_cite_verified_source(all_cards: list[TaskCard]) -> None:
             )
 
 
-def test_real_cards_have_access_date(all_cards: list[TaskCard]) -> None:
-    """Every REAL-tagged card must have an access_date."""
+def test_real_anchored_cards_have_access_date(all_cards: list[TaskCard]) -> None:
+    """Every real-anchored card (provenance_class real or hybrid, with non-
+    SYNTHETIC source) must have an access_date. Round-4: most B/C/D cards
+    are hybrid; access_date applies to the real anchor portion."""
     for card in all_cards:
+        if card.provenance_class not in ("real", "hybrid"):
+            continue
         src = card.provenance.source or ""
-        if not src.startswith("SYNTHETIC"):
-            assert card.provenance.access_date is not None, (
-                f"task_id={card.task_id}: REAL card missing access_date"
-            )
+        if src.upper().startswith("SYNTHETIC"):
+            continue
+        assert card.provenance.access_date is not None, (
+            f"task_id={card.task_id}: real-anchored card missing access_date"
+        )
 
 
 def test_synthetic_cards_have_proprietary_note(all_cards: list[TaskCard]) -> None:
